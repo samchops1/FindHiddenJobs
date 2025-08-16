@@ -39,7 +39,7 @@ export class MemStorage implements IStorage {
       description: insertJob.description || null,
       location: insertJob.location || null,
       logo: insertJob.logo || null,
-      tags: Array.isArray(insertJob.tags) ? insertJob.tags : (insertJob.tags ? [insertJob.tags as string] : []),
+      tags: Array.isArray(insertJob.tags) ? insertJob.tags as string[] : [],
       scrapedAt: new Date()
     };
     this.jobs.set(id, job);
