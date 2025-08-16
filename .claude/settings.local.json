@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run check)",
+      "Bash(npm run build)",
+      "Bash(timeout 5 npm run dev)",
+      "Bash(true)",
+      "Bash(curl -s 'http://localhost:5000/api/search?query=developer&site=all&location=all')",
+      "Bash(curl -s http://localhost:5000)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

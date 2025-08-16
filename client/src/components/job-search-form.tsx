@@ -108,6 +108,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectItem value="myworkdayjobs.com">📊 Workday</SelectItem>
                             <SelectItem value="adp">🏢 ADP</SelectItem>
                             <SelectItem value="careers.*">🚀 Career Pages</SelectItem>
+                            <SelectItem value="other-pages">📋 Other Job Pages</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
