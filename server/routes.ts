@@ -69,8 +69,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 function buildSearchUrl(query: string, site: string, location: string = "all"): string {
-  // Use broader search terms that are more likely to return results
-  const baseQuery = encodeURIComponent(query);
+  // Use quoted search terms for more precise results
+  const quotedQuery = encodeURIComponent(`"${query}"`);
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
   switch (site) {
@@ -78,16 +78,16 @@ function buildSearchUrl(query: string, site: string, location: string = "all"): 
       const linkedinLocation = location === "remote" ? "Remote" : "";
       return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${linkedinLocation}`;
     case "adp":
-      const adpQuery = `${baseQuery} site:workforcenow.adp.com OR site:myjobs.adp.com${locationFilter}`;
-      return `https://www.google.com/search?q=${adpQuery}&hl=en&num=20`;
+      const adpQuery = `${quotedQuery} site:workforcenow.adp.com OR site:myjobs.adp.com${locationFilter}`;
+      return `https://www.google.com/search?q=${adpQuery}&hl=en&num=100`;
     case "careers.*":
-      const careersQuery = `${baseQuery} inurl:careers OR inurl:career${locationFilter}`;
-      return `https://www.google.com/search?q=${careersQuery}&hl=en&num=20`;
+      const careersQuery = `${quotedQuery} inurl:careers OR inurl:career${locationFilter}`;
+      return `https://www.google.com/search?q=${careersQuery}&hl=en&num=100`;
     case "other-pages":
-      const otherQuery = `${baseQuery} inurl:employment OR inurl:opportunities OR inurl:openings${locationFilter}`;
-      return `https://www.google.com/search?q=${otherQuery}&hl=en&num=20`;
+      const otherQuery = `${quotedQuery} inurl:employment OR inurl:opportunities OR inurl:openings${locationFilter}`;
+      return `https://www.google.com/search?q=${otherQuery}&hl=en&num=100`;
     default:
-      return `https://www.google.com/search?q=${baseQuery} site:${site}${locationFilter}&hl=en&num=20`;
+      return `https://www.google.com/search?q=${quotedQuery} site:${site}${locationFilter}&hl=en&num=100`;
   }
 }
 
@@ -351,7 +351,8 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
 
     const jobs: InsertJob[] = [];
     const linksArray = Array.from(jobLinks);
-    const scrapePromises = linksArray.slice(0, 7).map(link => scrapeJobDetails(link));
+    // Scrape all available job links, no limit
+    const scrapePromises = linksArray.map(link => scrapeJobDetails(link));
 
     const results = await Promise.allSettled(scrapePromises);
     results.forEach(result => {
