@@ -1,0 +1,470 @@
+// ---------------------------------------------------
+// 1. Backend File: server.js (UPGRADED LOGIC)
+// This code runs on a server (like Replit's backend).
+// It now handles multiple ATS types and complex URL generation.
+// ---------------------------------------------------
+// To run this, you need to install express and cheerio:
+// In the Replit shell/console:
+// npm install express cheerio node-fetch
+// ---------------------------------------------------
+
+const express = require('express');
+const fetch = require('node-fetch');
+const cheerio = require('cheerio');
+
+const app = express();
+const port = 3000;
+
+// Serve the frontend files (index.html, style.css, script.js)
+app.use(express.static('public'));
+
+/**
+ * Builds the specific search URL based on the site type.
+ * This mirrors the logic from your original HTML file.
+ * @param {string} query - The job title search query.
+ * @param {string} site - The key for the selected site (e.g., "greenhouse.io").
+ * @returns {string} The fully constructed search URL.
+ */
+function buildSearchUrl(query, site) {
+    const encodedQuery = encodeURIComponent(`"${query}"`);
+    let url = '';
+
+    switch (site) {
+        case "linkedin.com":
+            // LinkedIn has a unique URL structure, not a Google search
+            return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=Remote`;
+        case "adp":
+            const adpQuery = `${encodedQuery} (site:workforcenow.adp.com OR site:myjobs.adp.com) remote`;
+            return `https://www.google.com/search?q=${adpQuery}&hl=en`;
+        case "careers.*":
+            const careersQuery = `${encodedQuery} (site:careers.* OR site:*/careers/* OR site:*/career/*) remote`;
+            return `https://www.google.com/search?q=${careersQuery}&hl=en`;
+        case "other-pages":
+             const otherQuery = `${encodedQuery} (site:*/employment/* OR site:*/opportunities/* OR site:*/openings/*) remote`;
+            return `https://www.google.com/search?q=${otherQuery}&hl=en`;
+        default:
+            // Default logic for most ATS sites that are searched via Google
+            return `https://www.google.com/search?q=${encodedQuery}+site:${site}+remote&hl=en`;
+    }
+}
+
+/**
+ * Scrapes the details from a single job posting URL.
+ * It uses different selectors for different ATS platforms.
+ * @param {string} link - The URL of the job posting.
+ * @returns {object|null} An object with job details or null if scraping fails.
+ */
+async function scrapeJobDetails(link) {
+    try {
+        const response = await fetch(link, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+        });
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        let title, company, location, description;
+
+        // --- Smart Scraper Logic ---
+        // Add rules for each ATS here.
+        if (link.includes('boards.greenhouse.io')) {
+            title = $('#app_title').text().trim();
+            company = $('.company-name').text().trim().replace('at ', '');
+            location = $('.location').text().trim();
+            description = $('#content').html();
+        } else if (link.includes('jobs.lever.co')) {
+            title = $('h2.posting-headline').text().trim();
+            // Lever often has company name in the title or URL, let's try to get it
+            const companyFromTitle = $('.main-header-mobile .posting-headline a').text().trim();
+            company = companyFromTitle || $('meta[property="og:site_name"]').attr('content');
+            location = $('.posting-categories .location').text().trim();
+            description = $('div[data-qa="job-description"]').html();
+        } else if (link.includes('jobs.ashbyhq.com')) {
+            title = $('h1[class*="_title_"]').text().trim();
+            company = $('a[class*="_companyName_"]').text().trim();
+            location = $('div[class*="_location_"]').text().trim();
+            description = $('div[class*="_description_"]').html();
+        }
+        // Add more 'else if' blocks for other ATS platforms as you identify their selectors
+
+        if (title) {
+            return {
+                title,
+                company: company || 'N/A', // Fallback if company name isn't found
+                location,
+                description,
+                url: link,
+                logo: `https://logo.clearbit.com/${company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
+            };
+        }
+        return null;
+
+    } catch (error) {
+        console.error(`Error scraping ${link}:`, error.message);
+        return null;
+    }
+}
+
+
+// API endpoint that the frontend will call
+app.get('/search', async (req, res) => {
+    const { query, site } = req.query;
+
+    if (!query || !site) {
+        return res.status(400).json({ error: 'Query and site parameters are required.' });
+    }
+
+    try {
+        const searchUrl = buildSearchUrl(query, site);
+
+        const searchResponse = await fetch(searchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+        });
+        const searchHtml = await searchResponse.text();
+        const $ = cheerio.load(searchHtml);
+
+        const jobLinks = new Set(); // Use a Set to avoid duplicate links
+        $('a').each((i, element) => {
+            const href = $(element).attr('href');
+            if (href && href.startsWith('/url?q=')) {
+                const url = new URL(`https://google.com${href}`);
+                const cleanUrl = url.searchParams.get('q');
+                // Ensure we are only grabbing links to actual job boards
+                if (cleanUrl.includes('jobs.lever.co') || cleanUrl.includes('boards.greenhouse.io') || cleanUrl.includes('jobs.ashbyhq.com')) {
+                    jobLinks.add(cleanUrl);
+                }
+            }
+        });
+
+        const jobs = [];
+        const scrapePromises = Array.from(jobLinks).slice(0, 7).map(link => scrapeJobDetails(link));
+
+        for (const jobPromise of scrapePromises) {
+            const job = await jobPromise;
+            if (job) { // Only add if scraping was successful
+                jobs.push(job);
+            }
+        }
+        
+        res.json(jobs);
+
+    } catch (error) {
+        console.error('Scraping failed:', error);
+        res.status(500).json({ error: 'Failed to fetch job search results.' });
+    }
+});
+
+app.listen(port, () => {
+    console.log(`Server listening at http://localhost:${port}`);
+});
+
+
+// ---------------------------------------------------
+// 2. Frontend File: public/index.html (UPGRADED)
+// This is the main page the user sees.
+// ---------------------------------------------------
+/*
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Job Search</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Direct Job Search</h1>
+        <p>Real-time job listings pulled directly from company career pages.</p>
+    </header>
+    <main>
+        <div class="search-container">
+            <input type="text" id="jobTitle" placeholder="Enter job title (e.g., Software Engineer)">
+            <select id="atsSite">
+                <option value="boards.greenhouse.io">Greenhouse</option>
+                <option value="jobs.lever.co">Lever</option>
+                <option value="jobs.ashbyhq.com">Ashby</option>
+                <option value="jobs.workable.com">Workable</option>
+                <option value="myworkdayjobs.com">Workday</option>
+                <option value="adp">ADP</option>
+                <option value="careers.*">Careers Pages</option>
+                <option value="other-pages">Other Job Pages</option>
+                <!-- LinkedIn is commented out as scraping it directly is very difficult and often blocked -->
+                <!-- <option value="linkedin.com">LinkedIn</option> -->
+            </select>
+            <button id="searchButton">Search</button>
+        </div>
+        <div id="results-container" class="results-container">
+            <!-- Job cards will be inserted here by JavaScript -->
+            <div id="loader" class="loader" style="display: none;"></div>
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2024 Your Job Board</p>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
+*/
+
+
+// ---------------------------------------------------
+// 3. Frontend File: public/style.css
+// This file makes the interface look beautiful. (No changes needed)
+// ---------------------------------------------------
+/*
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #0D47A1;
+    --secondary-color: #FFB300;
+    --background-color: #f4f5f7;
+    --card-background: #ffffff;
+    --text-color: #333;
+    --light-text-color: #666;
+    --border-color: #e0e0e0;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+header {
+    background: linear-gradient(90deg, var(--primary-color), #1976D2);
+    color: white;
+    text-align: center;
+    padding: 2rem 1rem;
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+}
+
+main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.search-container {
+    display: flex;
+    gap: 0.5rem;
+    background-color: var(--card-background);
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-top: -2rem;
+    position: relative;
+    z-index: 10;
+}
+
+#jobTitle, #atsSite {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+#searchButton {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#searchButton:hover {
+    background-color: #1976D2;
+}
+
+.results-container {
+    margin-top: 2rem;
+}
+
+.job-card {
+    background-color: var(--card-background);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.company-logo {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: contain;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.job-details h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.25rem;
+}
+
+.job-details .company {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.job-details .location {
+    color: var(--light-text-color);
+    margin-bottom: 1rem;
+}
+
+.job-description {
+    max-height: 150px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.job-description::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: linear-gradient(to top, var(--card-background), transparent);
+}
+
+.apply-button {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    background-color: var(--secondary-color);
+    color: #333;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background-color 0.3s ease;
+}
+
+.apply-button:hover {
+    background-color: #ffca28;
+}
+
+.loader {
+    border: 6px solid var(--background-color);
+    border-top: 6px solid var(--primary-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 3rem auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    margin-top: 2rem;
+    color: var(--light-text-color);
+}
+*/
+
+
+// ---------------------------------------------------
+// 4. Frontend File: public/script.js
+// This script runs in the user's browser. (No changes needed)
+// ---------------------------------------------------
+/*
+document.addEventListener('DOMContentLoaded', () => {
+    const searchButton = document.getElementById('searchButton');
+    const jobTitleInput = document.getElementById('jobTitle');
+    const atsSiteSelect = document.getElementById('atsSite');
+    const resultsContainer = document.getElementById('results-container');
+    const loader = document.getElementById('loader');
+
+    const searchJobs = async () => {
+        const query = jobTitleInput.value.trim();
+        const site = atsSiteSelect.value;
+
+        if (!query) {
+            alert('Please enter a job title.');
+            return;
+        }
+
+        // Show loader and clear previous results
+        loader.style.display = 'block';
+        resultsContainer.innerHTML = ''; // Clear previous results but keep loader reference
+        resultsContainer.appendChild(loader);
+
+
+        try {
+            // Call our backend API
+            const response = await fetch(`/search?query=${encodeURIComponent(query)}&site=${site}`);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const jobs = await response.json();
+
+            // Hide loader
+            loader.style.display = 'none';
+
+            if (jobs.length === 0) {
+                resultsContainer.innerHTML = '<p>No jobs found. Try a different title or site.</p>';
+                return;
+            }
+
+            // Create and display a card for each job
+            jobs.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'job-card';
+
+                card.innerHTML = `
+                    <img src="${job.logo}" alt="${job.company} Logo" class="company-logo" onerror="this.style.display='none'">
+                    <div class="job-details">
+                        <h2>${job.title}</h2>
+                        <p class="company">${job.company}</p>
+                        <p class="location">${job.location}</p>
+                        <div class="job-description">
+                            ${job.description}
+                        </div>
+                        <a href="${job.url}" target="_blank" rel="noopener noreferrer" class="apply-button">Apply Now</a>
+                    </div>
+                `;
+                resultsContainer.appendChild(card);
+            });
+
+        } catch (error) {
+            loader.style.display = 'none';
+            resultsContainer.innerHTML = '<p>Sorry, an error occurred while fetching jobs.</p>';
+            console.error('Fetch error:', error);
+        }
+    };
+
+    searchButton.addEventListener('click', searchJobs);
+    jobTitleInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            searchJobs();
+        }
+    });
+});
+*/
