@@ -36,6 +36,10 @@ export class MemStorage implements IStorage {
     const job: Job = { 
       ...insertJob, 
       id,
+      description: insertJob.description || null,
+      location: insertJob.location || null,
+      logo: insertJob.logo || null,
+      tags: Array.isArray(insertJob.tags) ? insertJob.tags : (insertJob.tags ? [insertJob.tags as string] : []),
       scrapedAt: new Date()
     };
     this.jobs.set(id, job);
@@ -47,7 +51,8 @@ export class MemStorage implements IStorage {
   }
 
   async getRecentSearches(): Promise<Search[]> {
-    return Array.from(this.searches.values())
+    const searchesArray = Array.from(this.searches.values());
+    return searchesArray
       .sort((a, b) => (b.searchedAt?.getTime() || 0) - (a.searchedAt?.getTime() || 0))
       .slice(0, 10);
   }
@@ -57,6 +62,7 @@ export class MemStorage implements IStorage {
     const search: Search = {
       ...insertSearch,
       id,
+      resultCount: insertSearch.resultCount || null,
       searchedAt: new Date()
     };
     this.searches.set(id, search);
@@ -65,11 +71,14 @@ export class MemStorage implements IStorage {
 
   async clearOldJobs(): Promise<void> {
     const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-    for (const [id, job] of this.jobs.entries()) {
+    const entriesToDelete: string[] = [];
+    const jobEntries = Array.from(this.jobs.entries());
+    for (const [id, job] of jobEntries) {
       if (job.scrapedAt && job.scrapedAt < cutoffTime) {
-        this.jobs.delete(id);
+        entriesToDelete.push(id);
       }
     }
+    entriesToDelete.forEach(id => this.jobs.delete(id));
   }
 }
 

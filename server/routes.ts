@@ -9,16 +9,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Job search endpoint
   app.get('/api/search', async (req, res) => {
     try {
-      const { query, site } = searchRequestSchema.parse(req.query);
+      const { query, site, location } = searchRequestSchema.parse(req.query);
       
       // Store search history
       await storage.createSearch({
         query,
-        platform: site,
+        platform: site === 'all' ? 'All Platforms' : site,
         resultCount: "0"
       });
 
-      const jobs = await scrapeJobs(query, site);
+      const jobs = await scrapeJobsFromAllPlatforms(query, site, location);
       
       // Store scraped jobs
       for (const jobData of jobs) {
@@ -68,23 +68,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-function buildSearchUrl(query: string, site: string): string {
+function buildSearchUrl(query: string, site: string, location: string = "all"): string {
   const encodedQuery = encodeURIComponent(`"${query}"`);
+  const locationFilter = location === "remote" ? "+remote" : location === "onsite" ? "-remote" : "";
   
   switch (site) {
     case "linkedin.com":
-      return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=Remote`;
+      const linkedinLocation = location === "remote" ? "Remote" : "";
+      return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${linkedinLocation}`;
     case "adp":
-      const adpQuery = `${encodedQuery} (site:workforcenow.adp.com OR site:myjobs.adp.com) remote`;
+      const adpQuery = `${encodedQuery} (site:workforcenow.adp.com OR site:myjobs.adp.com)${locationFilter}`;
       return `https://www.google.com/search?q=${adpQuery}&hl=en`;
     case "careers.*":
-      const careersQuery = `${encodedQuery} (site:careers.* OR site:*/careers/* OR site:*/career/*) remote`;
+      const careersQuery = `${encodedQuery} (site:careers.* OR site:*/careers/* OR site:*/career/*)${locationFilter}`;
       return `https://www.google.com/search?q=${careersQuery}&hl=en`;
     case "other-pages":
-      const otherQuery = `${encodedQuery} (site:*/employment/* OR site:*/opportunities/* OR site:*/openings/*) remote`;
+      const otherQuery = `${encodedQuery} (site:*/employment/* OR site:*/opportunities/* OR site:*/openings/*)${locationFilter}`;
       return `https://www.google.com/search?q=${otherQuery}&hl=en`;
     default:
-      return `https://www.google.com/search?q=${encodedQuery}+site:${site}+remote&hl=en`;
+      return `https://www.google.com/search?q=${encodedQuery}+site:${site}${locationFilter}&hl=en`;
   }
 }
 
@@ -146,11 +148,11 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
         title,
         company,
         location: location || 'Remote',
-        description: description.substring(0, 1000), // Limit description length
+        description: description ? description.substring(0, 1000) : null, // Limit description length
         url: link,
         logo: `https://logo.clearbit.com/${cleanCompany}.com`,
         platform,
-        tags: extractTags(title, description)
+        tags: extractTags(title, description || '')
       };
     }
     
@@ -181,9 +183,40 @@ function extractTags(title: string, description: string): string[] {
   return [...new Set(tags)].slice(0, 5); // Limit to 5 unique tags
 }
 
-async function scrapeJobs(query: string, site: string): Promise<InsertJob[]> {
+async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string): Promise<InsertJob[]> {
+  const platforms = site === 'all' ? [
+    'boards.greenhouse.io',
+    'jobs.lever.co', 
+    'jobs.ashbyhq.com',
+    'jobs.workable.com',
+    'myworkdayjobs.com',
+    'adp',
+    'careers.*'
+  ] : [site];
+
+  const allJobs: InsertJob[] = [];
+  
+  for (const platform of platforms) {
+    try {
+      const jobs = await scrapeJobsFromPlatform(query, platform, location);
+      allJobs.push(...jobs);
+    } catch (error) {
+      console.error(`Failed to scrape ${platform}:`, error);
+      // Continue with other platforms even if one fails
+    }
+  }
+  
+  // Remove duplicates based on URL
+  const uniqueJobs = allJobs.filter((job, index, self) => 
+    index === self.findIndex(j => j.url === job.url)
+  );
+  
+  return uniqueJobs;
+}
+
+async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    const searchUrl = buildSearchUrl(query, site);
+    const searchUrl = buildSearchUrl(query, site, location);
     
     const searchResponse = await fetch(searchUrl, {
       headers: { 
@@ -219,7 +252,8 @@ async function scrapeJobs(query: string, site: string): Promise<InsertJob[]> {
     });
 
     const jobs: InsertJob[] = [];
-    const scrapePromises = Array.from(jobLinks).slice(0, 10).map(link => scrapeJobDetails(link));
+    const linksArray = Array.from(jobLinks);
+    const scrapePromises = linksArray.slice(0, 5).map(link => scrapeJobDetails(link));
 
     const results = await Promise.allSettled(scrapePromises);
     results.forEach(result => {
@@ -231,6 +265,6 @@ async function scrapeJobs(query: string, site: string): Promise<InsertJob[]> {
     return jobs;
   } catch (error) {
     console.error('Scraping failed:', error);
-    throw new Error(`Failed to scrape jobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return []; // Return empty array instead of throwing
   }
 }

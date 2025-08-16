@@ -48,15 +48,15 @@ export default function Home() {
               <div className="flex items-center justify-center space-x-6 text-primary-100 text-sm">
                 <div className="flex items-center">
                   <Search className="w-4 h-4 mr-2" />
-                  <span>Real-time scraping</span>
+                  <span>Live job scraping</span>
                 </div>
                 <div className="flex items-center">
                   <Building className="w-4 h-4 mr-2" />
-                  <span>8+ ATS platforms</span>
+                  <span>Multiple platforms</span>
                 </div>
                 <div className="flex items-center">
                   <Globe className="w-4 h-4 mr-2" />
-                  <span>Remote-first</span>
+                  <span>All locations</span>
                 </div>
               </div>
             </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Briefcase, Building, Search } from "lucide-react";
+import { Briefcase, Building, Search, MapPin } from "lucide-react";
 
 interface JobSearchFormProps {
   onSearch: (params: SearchRequest) => void;
@@ -19,7 +19,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
     resolver: zodResolver(searchRequestSchema),
     defaultValues: {
       query: "",
-      site: "boards.greenhouse.io",
+      site: "all",
+      location: "all",
     },
   });
 
@@ -49,7 +50,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <div className="grid md:grid-cols-12 gap-4">
-            <div className="md:col-span-5">
+            <div className="md:col-span-4">
               <FormField
                 control={form.control}
                 name="query"
@@ -75,7 +76,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-4">
+            <div className="md:col-span-3">
               <FormField
                 control={form.control}
                 name="site"
@@ -95,6 +96,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="all">🔍 All Platforms</SelectItem>
                             <SelectItem value="boards.greenhouse.io">🌱 Greenhouse</SelectItem>
                             <SelectItem value="jobs.lever.co">🎯 Lever</SelectItem>
                             <SelectItem value="jobs.ashbyhq.com">💼 Ashby</SelectItem>
@@ -102,7 +104,6 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectItem value="myworkdayjobs.com">📊 Workday</SelectItem>
                             <SelectItem value="adp">🏢 ADP</SelectItem>
                             <SelectItem value="careers.*">🚀 Career Pages</SelectItem>
-                            <SelectItem value="other-pages">🔍 Other Platforms</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -113,7 +114,40 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-3 flex items-end">
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium text-gray-700">
+                      Location
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger 
+                            className="pl-12 py-3 border-gray-300 focus:ring-2 focus:ring-primary-500"
+                            data-testid="select-location"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">🌍 All Locations</SelectItem>
+                            <SelectItem value="remote">🏠 Remote Only</SelectItem>
+                            <SelectItem value="onsite">🏢 On-site Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-2 flex items-end">
               <Button
                 type="submit"
                 disabled={isSubmitting}
