@@ -71,14 +71,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function buildSearchUrl(query: string, site: string, location: string = "all"): string {
   // Use quoted search terms for more precise results
   const quotedQuery = encodeURIComponent(`"${query}"`);
+  const broadQuery = encodeURIComponent(query);
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
   switch (site) {
     case "linkedin.com":
       const linkedinLocation = location === "remote" ? "Remote" : "";
       return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${linkedinLocation}`;
+    case "boards.greenhouse.io":
+      // Try both quoted and unquoted for better results
+      const greenhouseQuery = `${broadQuery} site:boards.greenhouse.io ${locationFilter}`;
+      return `https://www.google.com/search?q=${greenhouseQuery}&hl=en&num=100`;
+    case "jobs.lever.co":
+      const leverQuery = `${broadQuery} site:jobs.lever.co ${locationFilter}`;
+      return `https://www.google.com/search?q=${leverQuery}&hl=en&num=100`;
+    case "jobs.ashbyhq.com":
+      const ashbyQuery = `${broadQuery} site:jobs.ashbyhq.com ${locationFilter}`;
+      return `https://www.google.com/search?q=${ashbyQuery}&hl=en&num=100`;
+    case "jobs.workable.com":
+      const workableQuery = `${broadQuery} site:jobs.workable.com ${locationFilter}`;
+      return `https://www.google.com/search?q=${workableQuery}&hl=en&num=100`;
+    case "myworkdayjobs.com":
+      const workdayQuery = `${broadQuery} site:myworkdayjobs.com ${locationFilter}`;
+      return `https://www.google.com/search?q=${workdayQuery}&hl=en&num=100`;
     case "adp":
-      const adpQuery = `${quotedQuery} site:workforcenow.adp.com OR site:myjobs.adp.com${locationFilter}`;
+      const adpQuery = `${broadQuery} site:workforcenow.adp.com OR site:myjobs.adp.com${locationFilter}`;
       return `https://www.google.com/search?q=${adpQuery}&hl=en&num=100`;
     case "careers.*":
       const careersQuery = `${quotedQuery} inurl:careers OR inurl:career${locationFilter}`;
@@ -343,6 +360,59 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     }
 
     console.log(`Found ${jobLinks.size} job links for ${site}`);
+    
+    // If no results with site-specific search, try a broader approach for ATS platforms
+    if (jobLinks.size === 0 && (site.includes('greenhouse.io') || site.includes('lever.co') || site.includes('ashbyhq.com') || site.includes('workable.com') || site.includes('workday'))) {
+      console.log(`Trying broader search for ${site}...`);
+      const broadSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)} jobs ${site.split('.')[0]}&hl=en&num=100`;
+      console.log(`Broader search URL: ${broadSearchUrl}`);
+      
+      try {
+        const broadResponse = await fetch(broadSearchUrl, {
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+          }
+        });
+        
+        if (broadResponse.ok) {
+          const broadHtml = await broadResponse.text();
+          const $broad = cheerio.load(broadHtml);
+          
+          $broad('a').each((i, element) => {
+            const href = $broad(element).attr('href');
+            if (!href) return;
+            
+            let cleanUrl = '';
+            if (href.startsWith('/url?q=')) {
+              try {
+                const url = new URL(`https://google.com${href}`);
+                cleanUrl = url.searchParams.get('q') || '';
+              } catch (urlError) {
+                return;
+              }
+            } else if (href.startsWith('http')) {
+              cleanUrl = href;
+            } else {
+              return;
+            }
+            
+            if (cleanUrl && cleanUrl.includes(site)) {
+              jobLinks.add(cleanUrl);
+            }
+          });
+          
+          console.log(`Broader search found ${jobLinks.size} additional job links for ${site}`);
+        }
+      } catch (error) {
+        console.log(`Broader search failed for ${site}:`, error);
+      }
+    }
     
     if (jobLinks.size === 0) {
       console.log(`No job links found for ${site}`);
