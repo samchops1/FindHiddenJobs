@@ -94,7 +94,7 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
   try {
     const response = await fetch(link, {
       headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
       }
     });
     
@@ -134,12 +134,24 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
       company = $('span[data-automation-id="jobPostingCompany"]').text().trim();
       location = $('span[data-automation-id="jobPostingLocation"]').text().trim();
       description = $('div[data-automation-id="jobPostingDescription"]').html() || '';
-    } else if (link.includes('workable.com')) {
+    } else if (link.includes('jobs.workable.com')) {
       platform = 'Workable';
       title = $('h1.job-title').text().trim();
       company = $('.company-name').text().trim();
       location = $('.location').text().trim();
       description = $('.job-description').html() || '';
+    } else if (link.includes('workforcenow.adp.com') || link.includes('myjobs.adp.com')) {
+      platform = 'ADP';
+      title = $('h1').first().text().trim() || $('.job-title').text().trim();
+      company = $('.company-name').text().trim() || $('[class*="company"]').text().trim();
+      location = $('.location').text().trim() || $('[class*="location"]').text().trim();
+      description = $('.job-description').html() || $('[class*="description"]').html() || '';
+    } else if (link.includes('/careers/') || link.includes('/career/')) {
+      platform = 'Career Pages';
+      title = $('h1').first().text().trim() || $('.job-title').text().trim();
+      company = $('.company-name').text().trim() || $('title').text().split(' - ')[0] || '';
+      location = $('.location').text().trim() || $('[class*="location"]').text().trim();
+      description = $('.job-description').html() || $('.description').html() || '';
     }
 
     if (title && company) {
@@ -147,8 +159,8 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
       return {
         title,
         company,
-        location: location || 'Remote',
-        description: description ? description.substring(0, 1000) : null, // Limit description length
+        location: location || 'Not specified',
+        description: description ? description.substring(0, 1000) : null,
         url: link,
         logo: `https://logo.clearbit.com/${cleanCompany}.com`,
         platform,
@@ -184,92 +196,6 @@ function extractTags(title: string, description: string): string[] {
   return uniqueTags.slice(0, 5); // Limit to 5 unique tags
 }
 
-async function scrapeDirectPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
-  // This would implement direct platform APIs if available
-  // For now, return empty array to fall back to Google search
-  return [];
-}
-
-function createSampleJobs(query: string, site: string, location: string): InsertJob[] {
-  // Create sample jobs to demonstrate the interface
-  const jobData = [
-    {
-      company: 'TechFlow',
-      platform: 'Greenhouse',
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'San Francisco, CA' : 'Remote',
-      description: 'Join our innovative team building next-generation software solutions. We offer competitive salary, equity, and comprehensive benefits. Work with cutting-edge technologies and make a real impact.'
-    },
-    {
-      company: 'DataVision',
-      platform: 'Lever', 
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'New York, NY' : 'Austin, TX',
-      description: 'Exciting opportunity to work on large-scale data platforms. We\'re looking for passionate engineers who want to solve complex problems and build systems that serve millions of users.'
-    },
-    {
-      company: 'CloudNine',
-      platform: 'Ashby',
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Seattle, WA' : 'Boston, MA',
-      description: 'Lead the development of cloud infrastructure solutions. Work with modern technologies, mentoring opportunities, and flexible work arrangements. Great team culture and growth potential.'
-    },
-    {
-      company: 'GlobalCorp',
-      platform: 'ADP',
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Dallas, TX' : 'Phoenix, AZ',
-      description: 'Enterprise-level position with one of the largest companies in the industry. Excellent benefits package, career advancement opportunities, and stable work environment.'
-    },
-    {
-      company: 'StartupXYZ',
-      platform: 'Career Pages',
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Los Angeles, CA' : 'Miami, FL',
-      description: 'Join a rapidly growing startup disrupting the market. Work directly with founders, equity compensation, and opportunity to make significant impact on product development.'
-    },
-    {
-      company: 'InnovateHub',
-      platform: 'Workday',
-      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Austin, TX' : 'Chicago, IL',
-      description: 'Be part of a fast-growing startup revolutionizing the industry. Competitive compensation, stock options, and the chance to shape the future of technology. Join our amazing team!'
-    }
-  ];
-
-  // Filter jobs based on platform selection
-  let filteredJobs = jobData;
-  
-  if (site !== 'all') {
-    // Map site names to platform names
-    const platformMap: Record<string, string> = {
-      'boards.greenhouse.io': 'Greenhouse',
-      'jobs.lever.co': 'Lever',
-      'jobs.ashbyhq.com': 'Ashby', 
-      'jobs.workable.com': 'Workable',
-      'myworkdayjobs.com': 'Workday',
-      'adp': 'ADP',
-      'careers.*': 'Career Pages',
-      'other-pages': 'Career Pages'
-    };
-    
-    const targetPlatform = platformMap[site];
-    if (targetPlatform) {
-      filteredJobs = jobData.filter(job => job.platform === targetPlatform);
-      if (filteredJobs.length === 0) {
-        // If no exact match, return the first job but update its platform
-        filteredJobs = [{ ...jobData[0], platform: targetPlatform }];
-      }
-    }
-  }
-  
-  const numJobs = site === 'all' ? 6 : Math.min(filteredJobs.length, 2);
-  
-  return filteredJobs.slice(0, numJobs).map((job, index) => ({
-    title: `${query} ${index === 0 ? '- Senior' : index === 1 ? '- Lead' : index === 2 ? '- Principal' : index === 3 ? '- Staff' : index === 4 ? '- Director' : '- VP'} Position`,
-    company: job.company,
-    location: job.location,
-    description: job.description,
-    url: `https://example.com/jobs/${job.company.toLowerCase()}-${index}`,
-    logo: `https://logo.clearbit.com/${job.company.toLowerCase()}.com`,
-    platform: job.platform,
-    tags: extractTags(query, job.description)
-  }));
-}
 
 async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
@@ -312,13 +238,74 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
 
 async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    console.log(`Scraping platform: ${site} for query: ${query}`);
+    const searchUrl = buildSearchUrl(query, site, location);
+    console.log(`Searching URL: ${searchUrl}`);
     
-    // For now, return sample jobs specific to each platform
-    return createSampleJobs(query, site, location);
+    const searchResponse = await fetch(searchUrl, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (!searchResponse.ok) {
+      throw new Error(`Search failed: HTTP ${searchResponse.status}`);
+    }
+    
+    const searchHtml = await searchResponse.text();
+    const $ = cheerio.load(searchHtml);
+
+    const jobLinks = new Set<string>();
+    
+    // Extract job links from Google search results
+    $('a').each((i, element) => {
+      const href = $(element).attr('href');
+      if (href && href.startsWith('/url?q=')) {
+        try {
+          const url = new URL(`https://google.com${href}`);
+          const cleanUrl = url.searchParams.get('q');
+          if (cleanUrl && (
+            cleanUrl.includes('jobs.lever.co') || 
+            cleanUrl.includes('boards.greenhouse.io') || 
+            cleanUrl.includes('jobs.ashbyhq.com') ||
+            cleanUrl.includes('myworkdayjobs.com') ||
+            cleanUrl.includes('jobs.workable.com') ||
+            cleanUrl.includes('workforcenow.adp.com') ||
+            cleanUrl.includes('myjobs.adp.com') ||
+            cleanUrl.includes('/careers/') ||
+            cleanUrl.includes('/career/') ||
+            cleanUrl.includes('/employment/') ||
+            cleanUrl.includes('/opportunities/') ||
+            cleanUrl.includes('/openings/')
+          )) {
+            jobLinks.add(cleanUrl);
+          }
+        } catch (urlError) {
+          // Skip invalid URLs
+        }
+      }
+    });
+
+    console.log(`Found ${jobLinks.size} job links for ${site}`);
+    
+    if (jobLinks.size === 0) {
+      console.log(`No job links found for ${site}`);
+      return [];
+    }
+
+    const jobs: InsertJob[] = [];
+    const linksArray = [...jobLinks];
+    const scrapePromises = linksArray.slice(0, 7).map(link => scrapeJobDetails(link));
+
+    const results = await Promise.allSettled(scrapePromises);
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        jobs.push(result.value);
+      }
+    });
+
+    return jobs;
   } catch (error) {
     console.error(`Scraping failed for ${site}:`, error);
-    // Return sample jobs as fallback
-    return createSampleJobs(query, site, location);
+    return [];
   }
 }
