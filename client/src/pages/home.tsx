@@ -33,55 +33,70 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-gradient-to-r from-primary-600 to-primary-700 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <h1 className="text-4xl font-bold text-white mb-2" data-testid="main-title">
-                DirectHire
-              </h1>
-              <p className="text-primary-100 text-lg mb-4">
-                Find your next opportunity across all major job platforms
-              </p>
-              <div className="flex items-center justify-center space-x-6 text-primary-100 text-sm">
-                <div className="flex items-center">
-                  <Search className="w-4 h-4 mr-2" />
-                  <span>Live job scraping</span>
+      <header className="bg-white border-b border-border shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <Search className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex items-center">
-                  <Building className="w-4 h-4 mr-2" />
-                  <span>Multiple platforms</span>
-                </div>
-                <div className="flex items-center">
-                  <Globe className="w-4 h-4 mr-2" />
-                  <span>All locations</span>
-                </div>
+                <h1 className="text-2xl font-bold text-foreground" data-testid="main-title">
+                  DirectHire
+                </h1>
+              </div>
+            </div>
+            <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
+              <div className="flex items-center space-x-1">
+                <Building className="w-4 h-4" />
+                <span>Multi-platform</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Globe className="w-4 h-4" />
+                <span>All locations</span>
               </div>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-primary-50 to-white border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center max-w-3xl mx-auto">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
+              Find your next opportunity
+            </h2>
+            <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+              Search across all major job platforms simultaneously. Get real-time results from the world's top companies.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-10">
         {/* Search Form */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 mb-8">
+        <div className="bg-card rounded-3xl shadow-lg border border-border p-8 mb-12">
           <JobSearchForm onSearch={handleSearch} />
         </div>
 
         {/* Results Section */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Results Header */}
           {(searchParams || isLoading) && (
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900" data-testid="results-title">
-                Job Opportunities
-              </h2>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center justify-between bg-card rounded-2xl p-6 border border-border">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground" data-testid="results-title">
+                  Job Opportunities
+                </h2>
+                <p className="text-muted-foreground mt-1">Find your perfect match</p>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted px-3 py-2 rounded-lg">
                 <Clock className="w-4 h-4" />
-                <span>Updated moments ago</span>
+                <span>Live results</span>
               </div>
             </div>
           )}
@@ -91,32 +106,34 @@ export default function Home() {
 
           {/* Error State */}
           {error && (
-            <Alert className="bg-red-50 border-red-200" data-testid="error-alert">
-              <AlertCircle className="h-4 w-4 text-red-500" />
-              <AlertDescription className="text-red-700">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-medium mb-1">Search failed</h3>
-                    <p className="mb-3">
-                      {error instanceof Error ? error.message : "An unexpected error occurred"}
-                    </p>
+            <div className="bg-card rounded-2xl border border-destructive/20 p-6" data-testid="error-alert">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
                   </div>
                 </div>
-                <button 
-                  onClick={handleRetry}
-                  className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200"
-                  data-testid="button-retry"
-                >
-                  <Search className="w-4 h-4 mr-2" />
-                  Retry Search
-                </button>
-              </AlertDescription>
-            </Alert>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Search failed</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {error instanceof Error ? error.message : "An unexpected error occurred"}
+                  </p>
+                  <button 
+                    onClick={handleRetry}
+                    className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-md"
+                    data-testid="button-retry"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Retry Search
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Job Results */}
           {jobs.length > 0 && (
-            <div className="space-y-6" data-testid="job-results">
+            <div className="space-y-4" data-testid="job-results">
               {jobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
@@ -125,19 +142,21 @@ export default function Home() {
 
           {/* Empty State */}
           {searchParams && !isLoading && !error && jobs.length === 0 && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 text-center" data-testid="empty-state">
+            <div className="bg-card rounded-2xl border border-border p-16 text-center" data-testid="empty-state">
               <div className="max-w-md mx-auto">
-                <Search className="w-16 h-16 mx-auto mb-6 text-gray-400" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No jobs found</h3>
-                <p className="text-gray-600 mb-4">
-                  Try adjusting your search criteria or exploring different platforms.
+                <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                  <Search className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-2xl font-semibold text-foreground mb-3">No jobs found</h3>
+                <p className="text-muted-foreground mb-6 leading-relaxed">
+                  Try adjusting your search criteria or exploring different platforms. We're constantly indexing new opportunities.
                 </p>
                 <button 
                   onClick={() => setSearchParams(null)}
-                  className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors duration-200"
+                  className="inline-flex items-center px-6 py-3 bg-primary hover:bg-primary/90 text-white font-medium rounded-xl transition-all duration-200 hover:shadow-lg transform hover:scale-105"
                   data-testid="button-new-search"
                 >
-                  <Search className="w-4 h-4 mr-2" />
+                  <Search className="w-5 h-5 mr-2" />
                   Try Different Search
                 </button>
               </div>
@@ -147,57 +166,54 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">DirectHire</h3>
-              <p className="text-gray-600 mb-4 max-w-md">
-                The smart way to search for jobs across all major ATS platforms. 
-                Get real-time results from Greenhouse, Lever, Ashby, and more.
+      <footer className="bg-card border-t border-border mt-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="md:col-span-1">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <Search className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">DirectHire</h3>
+              </div>
+              <p className="text-muted-foreground leading-relaxed max-w-sm">
+                The professional way to search for opportunities across all major job platforms. Find your next career move.
               </p>
             </div>
             
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">
-                Platforms
+              <h4 className="text-sm font-semibold text-foreground mb-6 uppercase tracking-wider">
+                Supported Platforms
               </h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>Greenhouse</li>
-                <li>Lever</li>
-                <li>Ashby</li>
-                <li>Workday</li>
-                <li>Workable</li>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="hover:text-foreground transition-colors cursor-pointer">Greenhouse</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Lever</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Ashby</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Workday</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Workable</li>
               </ul>
             </div>
             
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">
+              <h4 className="text-sm font-semibold text-foreground mb-6 uppercase tracking-wider">
                 Resources
               </h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li>API Documentation</li>
-                <li>Help Center</li>
-                <li>Privacy Policy</li>
-                <li>Terms of Service</li>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="hover:text-foreground transition-colors cursor-pointer">About</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Help Center</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Privacy Policy</li>
+                <li className="hover:text-foreground transition-colors cursor-pointer">Terms of Service</li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-gray-200 pt-8 mt-8">
+          <div className="border-t border-border pt-8 mt-12">
             <div className="flex flex-col md:flex-row justify-between items-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 &copy; 2024 DirectHire. All rights reserved.
               </p>
-              <div className="flex items-center space-x-4 mt-4 md:mt-0">
-                <span className="text-sm text-gray-500">Built with</span>
-                <div className="flex items-center space-x-2 text-xs text-gray-400">
-                  <span>Express.js</span>
-                  <span>•</span>
-                  <span>Cheerio</span>
-                  <span>•</span>
-                  <span>Node.js</span>
-                </div>
+              <div className="flex items-center space-x-3 mt-4 md:mt-0">
+                <span className="text-xs text-muted-foreground">Powered by modern web scraping</span>
               </div>
             </div>
           </div>

@@ -31,64 +31,70 @@ export function JobCard({ job }: JobCardProps) {
   };
 
   return (
-    <Card className="bg-white hover:shadow-xl border border-gray-100 transition-all duration-300 hover:transform hover:scale-[1.02]">
-      <CardContent className="p-6">
-        <div className="flex items-start space-x-4">
+    <Card className="bg-card hover:shadow-lg border border-border transition-all duration-300 hover:transform hover:scale-[1.01] group">
+      <CardContent className="p-8">
+        <div className="flex items-start space-x-6">
           {/* Company Logo */}
-          <img 
-            src={job.logo || 'https://via.placeholder.com/64x64?text=?'}
-            alt={`${job.company} logo`}
-            className="w-16 h-16 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = 'https://via.placeholder.com/64x64?text=?';
-            }}
-            data-testid={`img-company-logo-${job.id}`}
-          />
+          <div className="relative">
+            <img 
+              src={job.logo || 'https://via.placeholder.com/80x80?text=?'}
+              alt={`${job.company} logo`}
+              className="w-20 h-20 rounded-2xl object-cover border border-border flex-shrink-0 bg-muted group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = 'https://via.placeholder.com/80x80?text=?';
+              }}
+              data-testid={`img-company-logo-${job.id}`}
+            />
+          </div>
           
           {/* Job Details */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-1" data-testid={`text-job-title-${job.id}`}>
+                <h3 className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors duration-200" data-testid={`text-job-title-${job.id}`}>
                   {job.title}
                 </h3>
-                <p className="text-primary-600 font-medium mb-2" data-testid={`text-company-${job.id}`}>
+                <p className="text-primary font-semibold text-lg mb-3" data-testid={`text-company-${job.id}`}>
                   {job.company}
                 </p>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    <span data-testid={`text-location-${job.id}`}>{job.location}</span>
+                <div className="flex items-center space-x-6 text-sm text-muted-foreground mb-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <span className="font-medium" data-testid={`text-location-${job.id}`}>{job.location}</span>
                   </div>
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span>{getTimeAgo(job.scrapedAt)}</span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <span className="font-medium">{getTimeAgo(job.scrapedAt)}</span>
                   </div>
                 </div>
               </div>
               
               {/* Bookmark Button */}
-              <Button variant="ghost" size="sm" className="ml-4 p-2 text-gray-400 hover:text-primary-600">
-                <Bookmark className="w-4 h-4" />
+              <Button variant="ghost" size="sm" className="ml-4 p-3 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all duration-200">
+                <Bookmark className="w-5 h-5" />
               </Button>
             </div>
 
             {/* Job Description Preview */}
             {job.description && (
-              <div className="text-gray-700 mb-4 leading-relaxed" data-testid={`text-description-${job.id}`}>
-                <p className="mb-2">{formatDescription(job.description)}</p>
+              <div className="text-muted-foreground mb-6 leading-relaxed bg-muted/30 p-4 rounded-xl" data-testid={`text-description-${job.id}`}>
+                <p className="text-sm">{formatDescription(job.description)}</p>
               </div>
             )}
 
             {/* Tags */}
             {job.tags && job.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-6">
                 {job.tags.map((tag, index) => (
                   <Badge 
                     key={index}
                     variant="secondary"
-                    className="px-3 py-1 bg-blue-100 text-blue-800 text-xs"
+                    className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20 hover:bg-primary/20 transition-colors"
                     data-testid={`badge-tag-${index}-${job.id}`}
                   >
                     {tag}
@@ -98,26 +104,26 @@ export function JobCard({ job }: JobCardProps) {
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between pt-4 border-t border-border">
+              <div className="flex items-center space-x-4">
                 <Button
                   onClick={handleApply}
-                  className="bg-primary-600 hover:bg-primary-700 text-white"
+                  className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg transform hover:scale-105"
                   data-testid={`button-apply-${job.id}`}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Apply Now
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="px-4 py-2 rounded-xl border-border hover:bg-muted">
                   <Share className="w-4 h-4 mr-2" />
                   Share
                 </Button>
               </div>
               
-              <div className="text-sm text-gray-500" data-testid={`text-platform-${job.id}`}>
-                <span className="inline-flex items-center">
+              <div className="text-sm text-muted-foreground" data-testid={`text-platform-${job.id}`}>
+                <span className="inline-flex items-center bg-muted px-3 py-2 rounded-lg">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                  Via {job.platform}
+                  <span className="font-medium">Via {job.platform}</span>
                 </span>
               </div>
             </div>

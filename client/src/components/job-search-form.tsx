@@ -46,10 +46,14 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-foreground mb-2">Start Your Search</h3>
+        <p className="text-muted-foreground">Search thousands of jobs from top companies</p>
+      </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid md:grid-cols-12 gap-4">
+          <div className="grid md:grid-cols-12 gap-6">
             <div className="md:col-span-4">
               <FormField
                 control={form.control}
@@ -61,11 +65,11 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Briefcase className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Briefcase className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                         <Input
                           {...field}
                           placeholder="e.g., Software Engineer, Product Manager"
-                          className="pl-12 py-3 border-gray-300 focus:ring-2 focus:ring-primary-500"
+                          className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                           data-testid="input-job-title"
                         />
                       </div>
@@ -87,10 +91,10 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+                        <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 border-gray-300 focus:ring-2 focus:ring-primary-500"
+                            className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                             data-testid="select-platform"
                           >
                             <SelectValue />
@@ -125,10 +129,10 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
+                        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 border-gray-300 focus:ring-2 focus:ring-primary-500"
+                            className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                             data-testid="select-location"
                           >
                             <SelectValue />
@@ -151,10 +155,10 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 transition-all duration-200 transform hover:scale-105"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-4 px-8 text-lg rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
                 data-testid="button-search"
               >
-                <Search className="w-4 h-4 mr-2" />
+                <Search className="w-5 h-5 mr-2" />
                 {isSubmitting ? "Searching..." : "Search Jobs"}
               </Button>
             </div>
@@ -163,18 +167,20 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </Form>
 
       {/* Quick Filter Tags */}
-      <div className="flex flex-wrap gap-2">
-        <span className="text-sm text-gray-600">Popular searches:</span>
-        {quickSearchTerms.map((term) => (
-          <button
-            key={term}
-            onClick={() => handleQuickSearch(term)}
-            className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-full transition-colors duration-200"
-            data-testid={`button-quick-search-${term.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            {term}
-          </button>
-        ))}
+      <div className="text-center">
+        <span className="text-sm text-muted-foreground mb-4 block">Popular searches:</span>
+        <div className="flex flex-wrap justify-center gap-3">
+          {quickSearchTerms.map((term) => (
+            <button
+              key={term}
+              onClick={() => handleQuickSearch(term)}
+              className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground text-sm rounded-full transition-all duration-200 hover:shadow-md border border-border hover:border-primary/50"
+              data-testid={`button-quick-search-${term.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              {term}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
