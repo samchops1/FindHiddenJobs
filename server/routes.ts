@@ -326,13 +326,20 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       console.log(`No job links found. Checking all links found on page for ${site}:`);
       let linkCount = 0;
       $('a').each((i, element) => {
-        if (linkCount >= 5) return false; // Only log first 5 for debugging
+        if (linkCount >= 10) return false; // Log first 10 for debugging
         const href = $(element).attr('href');
         if (href) {
           console.log(`  Link ${linkCount + 1}: ${href}`);
           linkCount++;
         }
       });
+      
+      // Also check if Google is blocking us
+      const title = $('title').text();
+      console.log(`Page title: ${title}`);
+      if (title.toLowerCase().includes('unusual traffic') || title.toLowerCase().includes('blocked')) {
+        console.log('Google may be blocking our requests due to unusual traffic');
+      }
     }
 
     console.log(`Found ${jobLinks.size} job links for ${site}`);
