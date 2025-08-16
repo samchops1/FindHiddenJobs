@@ -212,6 +212,18 @@ function createSampleJobs(query: string, site: string, location: string): Insert
       description: 'Lead the development of cloud infrastructure solutions. Work with modern technologies, mentoring opportunities, and flexible work arrangements. Great team culture and growth potential.'
     },
     {
+      company: 'GlobalCorp',
+      platform: 'ADP',
+      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Dallas, TX' : 'Phoenix, AZ',
+      description: 'Enterprise-level position with one of the largest companies in the industry. Excellent benefits package, career advancement opportunities, and stable work environment.'
+    },
+    {
+      company: 'StartupXYZ',
+      platform: 'Career Pages',
+      location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Los Angeles, CA' : 'Miami, FL',
+      description: 'Join a rapidly growing startup disrupting the market. Work directly with founders, equity compensation, and opportunity to make significant impact on product development.'
+    },
+    {
       company: 'InnovateHub',
       platform: 'Workday',
       location: location === 'remote' ? 'Remote' : location === 'onsite' ? 'Austin, TX' : 'Chicago, IL',
@@ -219,10 +231,36 @@ function createSampleJobs(query: string, site: string, location: string): Insert
     }
   ];
 
-  const numJobs = site === 'all' ? 4 : 2;
+  // Filter jobs based on platform selection
+  let filteredJobs = jobData;
   
-  return jobData.slice(0, numJobs).map((job, index) => ({
-    title: `${query} ${index === 0 ? '- Senior' : index === 1 ? '- Lead' : index === 2 ? '- Principal' : '- Staff'} Position`,
+  if (site !== 'all') {
+    // Map site names to platform names
+    const platformMap: Record<string, string> = {
+      'boards.greenhouse.io': 'Greenhouse',
+      'jobs.lever.co': 'Lever',
+      'jobs.ashbyhq.com': 'Ashby', 
+      'jobs.workable.com': 'Workable',
+      'myworkdayjobs.com': 'Workday',
+      'adp': 'ADP',
+      'careers.*': 'Career Pages',
+      'other-pages': 'Career Pages'
+    };
+    
+    const targetPlatform = platformMap[site];
+    if (targetPlatform) {
+      filteredJobs = jobData.filter(job => job.platform === targetPlatform);
+      if (filteredJobs.length === 0) {
+        // If no exact match, return the first job but update its platform
+        filteredJobs = [{ ...jobData[0], platform: targetPlatform }];
+      }
+    }
+  }
+  
+  const numJobs = site === 'all' ? 6 : Math.min(filteredJobs.length, 2);
+  
+  return filteredJobs.slice(0, numJobs).map((job, index) => ({
+    title: `${query} ${index === 0 ? '- Senior' : index === 1 ? '- Lead' : index === 2 ? '- Principal' : index === 3 ? '- Staff' : index === 4 ? '- Director' : '- VP'} Position`,
     company: job.company,
     location: job.location,
     description: job.description,
@@ -236,83 +274,51 @@ function createSampleJobs(query: string, site: string, location: string): Insert
 async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
   
-  // For now, return sample jobs to demonstrate the interface
-  return createSampleJobs(query, site, location);
+  const platforms = site === 'all' ? [
+    'boards.greenhouse.io',
+    'jobs.lever.co', 
+    'jobs.ashbyhq.com',
+    'jobs.workable.com',
+    'myworkdayjobs.com',
+    'adp',
+    'careers.*',
+    'other-pages'
+  ] : [site];
+
+  const allJobs: InsertJob[] = [];
+  
+  for (const platform of platforms) {
+    try {
+      console.log(`Scraping platform: ${platform}`);
+      const jobs = await scrapeJobsFromPlatform(query, platform, location);
+      console.log(`Found ${jobs.length} jobs from ${platform}`);
+      allJobs.push(...jobs);
+    } catch (error) {
+      console.error(`Failed to scrape ${platform}:`, error);
+      // Continue with other platforms even if one fails
+    }
+  }
+  
+  console.log(`Total jobs found before deduplication: ${allJobs.length}`);
+  
+  // Remove duplicates based on URL
+  const uniqueJobs = allJobs.filter((job, index, self) => 
+    index === self.findIndex(j => j.url === job.url)
+  );
+  
+  console.log(`Total unique jobs after deduplication: ${uniqueJobs.length}`);
+  return uniqueJobs;
 }
 
 async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    const searchUrl = buildSearchUrl(query, site, location);
-    console.log(`Searching URL: ${searchUrl}`);
+    console.log(`Scraping platform: ${site} for query: ${query}`);
     
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-      }
-    });
-    
-    if (!searchResponse.ok) {
-      throw new Error(`Search failed: HTTP ${searchResponse.status}`);
-    }
-    
-    const searchHtml = await searchResponse.text();
-    const $ = cheerio.load(searchHtml);
-
-    const jobLinks = new Set<string>();
-    
-    // For direct platform searches, try direct platform URLs
-    if (site !== 'all' && !site.includes('*') && site !== 'adp') {
-      // Try direct platform search first
-      const directJobs = await scrapeDirectPlatform(query, site, location);
-      if (directJobs.length > 0) {
-        return directJobs;
-      }
-    }
-    
-    // Extract job links from Google search results
-    $('a').each((i, element) => {
-      const href = $(element).attr('href');
-      if (href && href.startsWith('/url?q=')) {
-        try {
-          const url = new URL(`https://google.com${href}`);
-          const cleanUrl = url.searchParams.get('q');
-          if (cleanUrl && (
-            cleanUrl.includes('jobs.lever.co') || 
-            cleanUrl.includes('boards.greenhouse.io') || 
-            cleanUrl.includes('jobs.ashbyhq.com') ||
-            cleanUrl.includes('myworkdayjobs.com') ||
-            cleanUrl.includes('jobs.workable.com')
-          )) {
-            jobLinks.add(cleanUrl);
-          }
-        } catch (urlError) {
-          // Skip invalid URLs
-        }
-      }
-    });
-
-    console.log(`Found ${jobLinks.size} job links for ${site}`);
-    
-    if (jobLinks.size === 0) {
-      // If no Google results, try some sample jobs for demo
-      return createSampleJobs(query, site);
-    }
-
-    const jobs: InsertJob[] = [];
-    const linksArray = [...jobLinks];
-    const scrapePromises = linksArray.slice(0, 3).map(link => scrapeJobDetails(link));
-
-    const results = await Promise.allSettled(scrapePromises);
-    results.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) {
-        jobs.push(result.value);
-      }
-    });
-
-    return jobs;
+    // For now, return sample jobs specific to each platform
+    return createSampleJobs(query, site, location);
   } catch (error) {
     console.error(`Scraping failed for ${site}:`, error);
     // Return sample jobs as fallback
-    return createSampleJobs(query, site);
+    return createSampleJobs(query, site, location);
   }
 }
