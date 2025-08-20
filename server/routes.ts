@@ -113,7 +113,13 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
       return [];
     }
     
-    const data = await response.json();
+    const data = await response.json() as {
+      items?: Array<{
+        link: string;
+        title?: string;
+        snippet?: string;
+      }>;
+    };
     
     if (!data.items) {
       console.log('No search results found');
@@ -123,7 +129,7 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
     // Extract job-related URLs from search results
     const jobLinks: string[] = [];
     
-    data.items.forEach((item: any) => {
+    data.items.forEach((item) => {
       const link = item.link;
       if (link && (
         link.includes('jobs.lever.co') || 
