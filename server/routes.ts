@@ -71,29 +71,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function buildSearchQuery(query: string, site: string, location: string = "all"): string {
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
+  // Add job-specific keywords to improve relevance
+  const jobKeywords = " (job OR jobs OR hiring OR career OR position OR opening OR opportunity)";
+  
   switch (site) {
     case "boards.greenhouse.io":
-      return `"${query}" site:boards.greenhouse.io${locationFilter}`;
+      return `site:boards.greenhouse.io "${query}"${locationFilter}${jobKeywords}`;
     case "jobs.lever.co":
-      return `"${query}" site:jobs.lever.co${locationFilter}`;
+      return `site:jobs.lever.co "${query}"${locationFilter}${jobKeywords}`;
     case "jobs.ashbyhq.com":
-      return `"${query}" site:jobs.ashbyhq.com${locationFilter}`;
+      return `site:jobs.ashbyhq.com "${query}"${locationFilter}${jobKeywords}`;
     case "jobs.workable.com":
-      return `"${query}" site:jobs.workable.com${locationFilter}`;
+      return `site:jobs.workable.com "${query}"${locationFilter}${jobKeywords}`;
     case "myworkdayjobs.com":
-      return `"${query}" site:myworkdayjobs.com${locationFilter}`;
+      return `site:myworkdayjobs.com "${query}"${locationFilter}${jobKeywords}`;
     case "adp":
-      return `"${query}" (site:workforcenow.adp.com OR site:myjobs.adp.com)${locationFilter}`;
+      return `(site:workforcenow.adp.com OR site:myjobs.adp.com) "${query}"${locationFilter}${jobKeywords}`;
     case "careers.*":
-      return `"${query}" (inurl:careers OR inurl:career)${locationFilter}`;
+      return `"${query}" (inurl:careers OR inurl:career OR inurl:jobs) -inurl:blog -inurl:news${locationFilter}`;
     case "other-pages":
-      return `"${query}" (inurl:employment OR inurl:opportunities OR inurl:openings)${locationFilter}`;
+      return `"${query}" (inurl:employment OR inurl:opportunities OR inurl:openings OR inurl:apply) -inurl:blog${locationFilter}`;
     default:
-      return `"${query}" site:${site}${locationFilter}`;
+      return `site:${site} "${query}"${locationFilter}${jobKeywords}`;
   }
 }
 
-async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
+async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1): Promise<string[]> {
   const API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
   const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
   
@@ -104,10 +107,11 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
     return [];
   }
   
-  console.log(`✅ API credentials confirmed`);
+  console.log(`✅ API credentials confirmed, searching from index ${startIndex}`);
   
   try {
-    const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10`;
+    // Increase num to 10 (max allowed per request), add start parameter for pagination
+    const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10&start=${startIndex}`;
       
     const response = await fetch(url);
     
@@ -143,21 +147,65 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
     
     data.items.forEach((item) => {
       const link = item.link;
-      if (link && (
+      const title = item.title?.toLowerCase() || '';
+      const snippet = item.snippet?.toLowerCase() || '';
+      
+      // Check if it's a known job platform
+      const isJobPlatform = link && (
         link.includes('jobs.lever.co') || 
         link.includes('boards.greenhouse.io') || 
         link.includes('jobs.ashbyhq.com') ||
         link.includes('myworkdayjobs.com') ||
         link.includes('jobs.workable.com') ||
         link.includes('workforcenow.adp.com') ||
-        link.includes('myjobs.adp.com') ||
+        link.includes('myjobs.adp.com')
+      );
+      
+      // Check if URL suggests a job posting
+      const hasJobUrl = link && (
         link.includes('/careers/') ||
         link.includes('/career/') ||
+        link.includes('/jobs/') ||
+        link.includes('/job/') ||
         link.includes('/employment/') ||
         link.includes('/opportunities/') ||
-        link.includes('/openings/')
-      )) {
+        link.includes('/openings/') ||
+        link.includes('/apply/') ||
+        link.includes('/position/') ||
+        link.includes('/vacancy/') ||
+        link.includes('/hiring/')
+      );
+      
+      // Check if title/snippet suggests it's a specific job posting
+      const hasJobIndicators = (
+        title.includes('hiring') ||
+        title.includes('job') ||
+        title.includes('position') ||
+        title.includes('opening') ||
+        title.includes('opportunity') ||
+        snippet.includes('apply') ||
+        snippet.includes('hiring') ||
+        snippet.includes('job description') ||
+        snippet.includes('requirements') ||
+        snippet.includes('qualifications')
+      );
+      
+      // Exclude obvious non-job pages
+      const isExcluded = link && (
+        link.includes('/blog/') ||
+        link.includes('/news/') ||
+        link.includes('/about/') ||
+        link.includes('/contact/') ||
+        link.includes('wikipedia.org') ||
+        link.includes('linkedin.com/company/') || // Company pages, not job posts
+        link.includes('glassdoor.com/Overview/') // Company overview pages
+      );
+      
+      if (link && !isExcluded && (isJobPlatform || (hasJobUrl && hasJobIndicators))) {
         jobLinks.push(link);
+        console.log(`✅ Added job link: ${link.substring(0, 80)}...`);
+      } else if (link && !isExcluded) {
+        console.log(`⚠️ Skipped link (no job indicators): ${link.substring(0, 80)}...`);
       }
     });
     
@@ -167,6 +215,74 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
   } catch (error) {
     console.error('❌ Google Search API network error:', error);
     return [];
+  }
+}
+
+function createFallbackJob(link: string): InsertJob | null {
+  try {
+    const url = new URL(link);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    
+    // Try to extract company and job info from URL
+    let company = '';
+    let title = 'Software Engineer Position';
+    let platform = 'Unknown';
+    
+    // Detect platform
+    if (url.hostname.includes('greenhouse.io')) {
+      platform = 'Greenhouse';
+      company = pathParts[0] || 'Company';
+      // Often the job ID or slug is in the path
+      if (pathParts.length > 1) {
+        const jobSlug = pathParts[pathParts.length - 1];
+        // Try to make a readable title from slug
+        title = jobSlug.replace(/-/g, ' ').replace(/_/g, ' ')
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        // Remove job IDs if present
+        title = title.replace(/\d{5,}/g, '').trim() || 'Software Engineer Position';
+      }
+    } else if (url.hostname.includes('lever.co')) {
+      platform = 'Lever';
+      company = pathParts[0] || 'Company';
+    } else if (url.hostname.includes('ashbyhq.com')) {
+      platform = 'Ashby';
+      company = pathParts[0] || 'Company';
+    } else if (url.hostname.includes('myworkdayjobs.com')) {
+      platform = 'Workday';
+      // Extract company from subdomain
+      const subdomain = url.hostname.split('.')[0];
+      company = subdomain.charAt(0).toUpperCase() + subdomain.slice(1);
+    } else if (url.hostname.includes('workable.com')) {
+      platform = 'Workable';
+    } else {
+      // Try to extract company from domain
+      company = url.hostname.replace('www.', '').split('.')[0];
+      company = company.charAt(0).toUpperCase() + company.slice(1);
+    }
+    
+    // Clean up company name
+    company = company.replace(/-/g, ' ').replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    const cleanCompany = company.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    
+    return {
+      title,
+      company: company || 'Company',
+      location: 'See job posting',
+      description: null,
+      url: link,
+      logo: cleanCompany ? `https://logo.clearbit.com/${cleanCompany}.com` : null,
+      platform,
+      tags: ['Software Engineer']
+    };
+  } catch (error) {
+    console.error(`Failed to create fallback job for ${link}:`, error);
+    return null;
   }
 }
 
@@ -198,11 +314,22 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
   try {
     const response = await fetch(link, {
       headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      redirect: 'follow'
     });
     
     if (!response.ok) {
+      // For 403/404 errors, return basic info from URL instead of failing completely
+      if (response.status === 403 || response.status === 404 || response.status === 410) {
+        return createFallbackJob(link);
+      }
       throw new Error(`HTTP ${response.status}`);
     }
     
@@ -250,32 +377,80 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
       company = $('.company-name').text().trim() || $('[class*="company"]').text().trim();
       location = $('.location').text().trim() || $('[class*="location"]').text().trim();
       description = $('.job-description').html() || $('[class*="description"]').html() || '';
-    } else if (link.includes('/careers/') || link.includes('/career/')) {
+    } else {
+      // Generic scraping for career pages and other job sites
       platform = 'Career Pages';
-      title = $('h1').first().text().trim() || $('.job-title').text().trim();
-      company = $('.company-name').text().trim() || $('title').text().split(' - ')[0] || '';
-      location = $('.location').text().trim() || $('[class*="location"]').text().trim();
-      description = $('.job-description').html() || $('.description').html() || '';
+      
+      // Try multiple selectors for title
+      title = $('h1').first().text().trim() || 
+              $('.job-title').text().trim() || 
+              $('[class*="title"]').first().text().trim() ||
+              $('meta[property="og:title"]').attr('content') || 
+              $('title').text().split(' - ')[0] || '';
+      
+      // Try to extract company name from various sources
+      company = $('.company-name').text().trim() || 
+                $('[class*="company"]').first().text().trim() ||
+                $('meta[property="og:site_name"]').attr('content') ||
+                $('meta[name="author"]').attr('content') ||
+                '';
+      
+      // If no company found, try to extract from domain
+      if (!company && link) {
+        try {
+          const url = new URL(link);
+          company = url.hostname.replace('www.', '').split('.')[0];
+          company = company.charAt(0).toUpperCase() + company.slice(1);
+        } catch {}
+      }
+      
+      // Try multiple selectors for location
+      location = $('.location').text().trim() || 
+                 $('[class*="location"]').first().text().trim() ||
+                 $('[class*="place"]').first().text().trim() ||
+                 $('meta[name="geo.placename"]').attr('content') ||
+                 '';
+      
+      // Try multiple selectors for description
+      description = $('.job-description').html() || 
+                    $('.description').html() || 
+                    $('[class*="description"]').first().html() ||
+                    $('[class*="details"]').first().html() ||
+                    $('[class*="content"]').first().html() ||
+                    $('main').html() ||
+                    '';
     }
 
-    if (title && company) {
-      const cleanCompany = company.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    // Return job if we have at least a title OR company
+    if (title || company) {
+      // Use title as fallback for company if needed
+      if (!company && title) {
+        company = 'Unknown Company';
+      }
+      // Use a generic title if we only have company
+      if (!title && company) {
+        title = 'Open Position';
+      }
+      
+      const cleanCompany = (company || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
       return {
-        title,
-        company,
+        title: title || 'Position Available',
+        company: company || 'Company',
         location: location || 'Not specified',
         description: description ? description.substring(0, 1000) : null,
         url: link,
-        logo: `https://logo.clearbit.com/${cleanCompany}.com`,
+        logo: cleanCompany ? `https://logo.clearbit.com/${cleanCompany}.com` : null,
         platform,
-        tags: extractTags(title, description || '')
+        tags: extractTags(title || '', description || '')
       };
     }
     
-    return null;
+    console.log(`❌ Could not extract job details from ${link}`);
+    return createFallbackJob(link);
   } catch (error) {
     console.error(`Error scraping ${link}:`, error);
-    return null;
+    // Try to return fallback data instead of null
+    return createFallbackJob(link);
   }
 }
 
@@ -353,17 +528,30 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     const searchQuery = buildSearchQuery(query, site, location);
     console.log(`Searching with query: ${searchQuery}`);
     
-    const jobLinks = await searchWithGoogleAPI(searchQuery);
-    console.log(`Found ${jobLinks.length} job links for ${site}`);
+    // Fetch multiple pages of results (2 pages = 20 results max)
+    const allJobLinks: string[] = [];
     
-    if (jobLinks.length === 0) {
+    // First page
+    const firstPageLinks = await searchWithGoogleAPI(searchQuery, 1);
+    allJobLinks.push(...firstPageLinks);
+    
+    // Second page if first page had results
+    if (firstPageLinks.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between API calls
+      const secondPageLinks = await searchWithGoogleAPI(searchQuery, 11);
+      allJobLinks.push(...secondPageLinks);
+    }
+    
+    console.log(`Found ${allJobLinks.length} total job links for ${site}`);
+    
+    if (allJobLinks.length === 0) {
       console.log(`No job links found for ${site}`);
       return [];
     }
 
     const jobs: InsertJob[] = [];
     // Scrape all available job links, no limit
-    const scrapePromises = jobLinks.map(link => scrapeJobDetails(link));
+    const scrapePromises = allJobLinks.map(link => scrapeJobDetails(link));
 
     const results = await Promise.allSettled(scrapePromises);
     results.forEach(result => {

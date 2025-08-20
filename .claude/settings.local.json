@@ -6,7 +6,11 @@
       "Bash(timeout 5 npm run dev)",
       "Bash(true)",
       "Bash(curl -s 'http://localhost:5000/api/search?query=developer&site=all&location=all')",
-      "Bash(curl -s http://localhost:5000)"
+      "Bash(curl -s http://localhost:5000)",
+      "Bash(curl -s 'http://localhost:5000/api/search?query=software%20engineer&site=boards.greenhouse.io&location=all')",
+      "Bash(env)",
+      "Bash(pkill -f \"tsx server/index.ts\")",
+      "Bash(npm run dev)"
     ],
     "deny": [],
     "ask": []
