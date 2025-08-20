@@ -19,15 +19,26 @@ export function JobCard({ job }: JobCardProps) {
     return plainText.length > 300 ? plainText.substring(0, 300) + '...' : plainText;
   };
 
-  const getTimeAgo = (date: Date | null) => {
-    if (!date) return 'Recently';
+  const formatDate = (date: Date | null) => {
+    if (!date) return 'Recently posted';
+    
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 1) return 'Just posted';
     if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInHours < 48) return 'Yesterday';
+    
+    // Show exact date for older posts
     const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ago`;
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    
+    // Show actual date for week+ old posts
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+    });
   };
 
   return (
@@ -69,7 +80,7 @@ export function JobCard({ job }: JobCardProps) {
                     <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                       <Calendar className="w-4 h-4" />
                     </div>
-                    <span className="font-medium">{getTimeAgo(job.scrapedAt)}</span>
+                    <span className="font-medium">{formatDate(job.scrapedAt)}</span>
                   </div>
                 </div>
               </div>

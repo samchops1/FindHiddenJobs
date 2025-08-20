@@ -104,13 +104,11 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
     return [];
   }
   
-  console.log(`✅ API Key exists: ${!!API_KEY} (length: ${API_KEY.length})`);
-  console.log(`✅ Search Engine ID: ${SEARCH_ENGINE_ID}`);
+  console.log(`✅ API credentials confirmed`);
   
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10`;
-    console.log(`🌐 API URL: ${url.replace(API_KEY, 'HIDDEN_KEY')}`);
-    
+      
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -349,22 +347,13 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
 
 async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    // Test basic Google API first
-    console.log(`\n🔍 Testing Google API for platform: ${site}`);
+    console.log(`\n🔍 Scraping platform: ${site}`);
     
-    // Try simple query first
-    const simpleQuery = `${query} jobs`;
-    console.log(`Testing with simple query: ${simpleQuery}`);
+    // Use site-specific search query now that API is working
+    const searchQuery = buildSearchQuery(query, site, location);
+    console.log(`Searching with query: ${searchQuery}`);
     
-    let jobLinks = await searchWithGoogleAPI(simpleQuery);
-    
-    // If simple query works but returns no relevant links, try site-specific
-    if (jobLinks.length === 0) {
-      const searchQuery = buildSearchQuery(query, site, location);
-      console.log(`Trying site-specific query: ${searchQuery}`);
-      jobLinks = await searchWithGoogleAPI(searchQuery);
-    }
-    
+    const jobLinks = await searchWithGoogleAPI(searchQuery);
     console.log(`Found ${jobLinks.length} job links for ${site}`);
     
     if (jobLinks.length === 0) {
@@ -383,6 +372,7 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       }
     });
 
+    console.log(`Successfully scraped ${jobs.length} jobs from ${site}`);
     return jobs;
   } catch (error) {
     console.error(`Scraping failed for ${site}:`, error);
