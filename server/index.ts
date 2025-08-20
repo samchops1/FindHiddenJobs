@@ -61,11 +61,52 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  
+  const startServer = async () => {
+    // Add a small delay to allow any previous processes to clean up
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    try {
+      const serverInstance = server.listen({
+        port,
+        host: "0.0.0.0",
+        reusePort: true,
+      });
+      
+      serverInstance.on('listening', () => {
+        log(`serving on port ${port}`);
+      });
+      
+      serverInstance.on('error', (err: any) => {
+        console.error('Server error:', err);
+        if (err.code === 'EADDRINUSE') {
+          log(`Port ${port} is already in use. Exiting to allow restart...`);
+          process.exit(1);
+        } else {
+          throw err;
+        }
+      });
+      
+      // Graceful shutdown
+      process.on('SIGTERM', () => {
+        log('SIGTERM received, shutting down gracefully...');
+        serverInstance.close(() => {
+          process.exit(0);
+        });
+      });
+      
+      process.on('SIGINT', () => {
+        log('SIGINT received, shutting down gracefully...');
+        serverInstance.close(() => {
+          process.exit(0);
+        });
+      });
+      
+    } catch (error) {
+      console.error('Failed to start server:', error);
+      process.exit(1);
+    }
+  };
+
+  await startServer();
 })();

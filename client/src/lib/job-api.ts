@@ -1,7 +1,19 @@
 import { apiRequest } from "./queryClient";
 import type { Job, Search, SearchRequest } from "@shared/schema";
 
-export async function searchJobs(searchParams: SearchRequest): Promise<Job[]> {
+export interface SearchResponse {
+  jobs: Job[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalJobs: number;
+    jobsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export async function searchJobs(searchParams: SearchRequest): Promise<SearchResponse> {
   const response = await apiRequest(
     "GET",
     `/api/search?${new URLSearchParams(searchParams as any).toString()}`

@@ -37,7 +37,9 @@ export const insertSearchSchema = createInsertSchema(searches).omit({
 export const searchRequestSchema = z.object({
   query: z.string().min(1, "Job title is required"),
   site: z.string().min(1, "Platform is required"),
-  location: z.enum(["all", "remote", "onsite"]).default("all"),
+  location: z.enum(["all", "remote", "onsite", "hybrid"]).default("all"),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(50).default(25),
 });
 
 export type InsertJob = z.infer<typeof insertJobSchema>;

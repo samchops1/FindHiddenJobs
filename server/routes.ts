@@ -9,7 +9,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Job search endpoint
   app.get('/api/search', async (req, res) => {
     try {
-      const { query, site, location } = searchRequestSchema.parse(req.query);
+      // Parse query parameters with default pagination values
+      const queryParams = {
+        ...req.query,
+        page: req.query.page ? parseInt(req.query.page as string) : 1,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 25
+      };
+      
+      const { query, site, location, page, limit } = searchRequestSchema.parse(queryParams);
       
       // Store search history
       await storage.createSearch({
@@ -18,21 +25,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resultCount: "0"
       });
 
-      const jobs = await scrapeJobsFromAllPlatforms(query, site, location);
+      const allJobs = await scrapeJobsFromAllPlatforms(query, site, location);
       
       // Store scraped jobs
-      for (const jobData of jobs) {
+      for (const jobData of allJobs) {
         await storage.createJob(jobData);
       }
+
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedJobs = allJobs.slice(startIndex, endIndex);
+      
+      // Calculate pagination metadata
+      const totalJobs = allJobs.length;
+      const totalPages = Math.ceil(totalJobs / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
 
       // Update search result count
       const searches = await storage.getRecentSearches();
       const latestSearch = searches[0];
       if (latestSearch) {
-        latestSearch.resultCount = jobs.length.toString();
+        latestSearch.resultCount = totalJobs.toString();
       }
 
-      res.json(jobs);
+      res.json({
+        jobs: paginatedJobs,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalJobs,
+          jobsPerPage: limit,
+          hasNextPage,
+          hasPrevPage
+        }
+      });
     } catch (error) {
       console.error('Search error:', error);
       res.status(500).json({ 
@@ -69,7 +97,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 function buildSearchQuery(query: string, site: string, location: string = "all"): string {
-  const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
+  // Add location filter to the search query
+  let locationFilter = "";
+  if (location === "remote") {
+    locationFilter = " remote";
+  } else if (location === "onsite") {
+    locationFilter = " onsite";
+  } else if (location === "hybrid") {
+    locationFilter = " hybrid";
+  }
   
   // Always wrap query in quotes for exact matching
   const quotedQuery = `"${query}"`;
@@ -90,6 +126,8 @@ function buildSearchQuery(query: string, site: string, location: string = "all")
   const jobKeywords = isExecutiveRole ? 
     " (position OR role OR opportunity OR opening)" : 
     " (job OR jobs OR hiring OR career OR position OR opening OR opportunity)";
+  
+  console.log(`🔍 Building search query: "${quotedQuery}" + location: "${locationFilter}" + keywords: "${jobKeywords}"`);
   
   switch (site) {
     case "boards.greenhouse.io":
@@ -507,18 +545,25 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     const searchQuery = buildSearchQuery(query, site, location);
     console.log(`Searching with query: ${searchQuery}`);
     
-    // Fetch multiple pages of results (2 pages = 20 results max)
+    // Fetch multiple pages of results to get more jobs
     const allJobLinks: string[] = [];
     
-    // First page
-    const firstPageLinks = await searchWithGoogleAPI(searchQuery, 1);
-    allJobLinks.push(...firstPageLinks);
-    
-    // Second page if first page had results
-    if (firstPageLinks.length > 0) {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between API calls
-      const secondPageLinks = await searchWithGoogleAPI(searchQuery, 11);
-      allJobLinks.push(...secondPageLinks);
+    // Get up to 5 pages (50 results max from Google API)
+    for (let page = 1; page <= 5; page++) {
+      const startIndex = (page - 1) * 10 + 1;
+      const pageLinks = await searchWithGoogleAPI(searchQuery, startIndex);
+      
+      if (pageLinks.length === 0) {
+        console.log(`No more results found on page ${page}, stopping...`);
+        break;
+      }
+      
+      allJobLinks.push(...pageLinks);
+      
+      // Add delay between API calls to respect rate limits
+      if (page < 5) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
     
     console.log(`Found ${allJobLinks.length} total job links for ${site}`);

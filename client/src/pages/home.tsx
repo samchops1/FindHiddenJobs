@@ -3,27 +3,38 @@ import { useQuery } from "@tanstack/react-query";
 import { JobSearchForm } from "@/components/job-search-form";
 import { JobCard } from "@/components/job-card";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
-import { searchJobs } from "@/lib/job-api";
-import { AlertCircle, Clock, Search, Building, Globe } from "lucide-react";
+import { searchJobs, type SearchResponse } from "@/lib/job-api";
+import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import type { Job, SearchRequest } from "@shared/schema";
 
 export default function Home() {
   const [searchParams, setSearchParams] = useState<SearchRequest | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const {
-    data: jobs = [],
+    data: searchResponse,
     isLoading,
     error,
     refetch
   } = useQuery({
-    queryKey: ["/api/search", searchParams],
-    queryFn: () => searchParams ? searchJobs(searchParams) : Promise.resolve([]),
+    queryKey: ["/api/search", searchParams, currentPage],
+    queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
     enabled: !!searchParams,
   });
 
+  const jobs = searchResponse?.jobs || [];
+  const pagination = searchResponse?.pagination;
+
   const handleSearch = (params: SearchRequest) => {
     setSearchParams(params);
+    setCurrentPage(1); // Reset to first page for new search
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRetry = () => {
@@ -92,7 +103,9 @@ export default function Home() {
                 <h2 className="text-2xl font-bold text-foreground" data-testid="results-title">
                   Job Opportunities
                 </h2>
-                <p className="text-muted-foreground mt-1">Find your perfect match</p>
+                <p className="text-muted-foreground mt-1">
+                  {pagination ? `${pagination.totalJobs} results found` : "Find your perfect match"}
+                </p>
               </div>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted px-3 py-2 rounded-lg">
                 <Clock className="w-4 h-4" />
@@ -137,6 +150,73 @@ export default function Home() {
               {jobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((pagination.currentPage - 1) * pagination.jobsPerPage) + 1} to {Math.min(pagination.currentPage * pagination.jobsPerPage, pagination.totalJobs)} of {pagination.totalJobs} results
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={!pagination.hasPrevPage}
+                    className="flex items-center space-x-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Previous</span>
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      const pageNum = i + 1;
+                      const isCurrentPage = pageNum === pagination.currentPage;
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={isCurrentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`w-10 h-10 ${isCurrentPage ? 'bg-primary text-white' : ''}`}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                    
+                    {pagination.totalPages > 5 && (
+                      <>
+                        {pagination.totalPages > 6 && <span className="px-2 text-muted-foreground">...</span>}
+                        <Button
+                          variant={pagination.currentPage === pagination.totalPages ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pagination.totalPages)}
+                          className={`w-10 h-10 ${pagination.currentPage === pagination.totalPages ? 'bg-primary text-white' : ''}`}
+                        >
+                          {pagination.totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={!pagination.hasNextPage}
+                    className="flex items-center space-x-1"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 

@@ -144,6 +144,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectItem value="all">🌍 All Locations</SelectItem>
                             <SelectItem value="remote">🏠 Remote Only</SelectItem>
                             <SelectItem value="onsite">🏢 On-site Only</SelectItem>
+                            <SelectItem value="hybrid">🔄 Hybrid</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
