@@ -312,6 +312,10 @@ async function testSimpleQuery(API_KEY: string, SEARCH_ENGINE_ID: string): Promi
 
 async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
   try {
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const response = await fetch(link, {
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -322,8 +326,11 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1'
       },
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       // For 403/404 errors, return basic info from URL instead of failing completely
@@ -490,33 +497,58 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
     'other-pages'
   ] : [site];
 
-  const allJobs: InsertJob[] = [];
+  let allJobs: InsertJob[] = [];
   
-  for (const platform of platforms) {
-    try {
-      console.log(`Scraping platform: ${platform}`);
-      const jobs = await scrapeJobsFromPlatform(query, platform, location);
-      console.log(`Found ${jobs.length} jobs from ${platform}`);
-      allJobs.push(...jobs);
-      
-      // Add delay between platforms to avoid rate limiting
-      if (platforms.length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+  // If searching all platforms, run in parallel for better performance
+  if (site === 'all') {
+    console.log(`🚀 Running parallel search across ${platforms.length} platforms`);
+    
+    // Run all platform searches in parallel
+    const searchPromises = platforms.map(async (platform) => {
+      try {
+        console.log(`🔍 Starting parallel search on: ${platform}`);
+        const jobs = await scrapeJobsFromPlatform(query, platform, location);
+        console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
+        return jobs;
+      } catch (error) {
+        console.error(`❌ Failed to scrape ${platform}:`, error);
+        return []; // Return empty array on failure
       }
+    });
+    
+    // Wait for all searches to complete
+    const results = await Promise.allSettled(searchPromises);
+    
+    // Collect all successful results
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        allJobs.push(...result.value);
+        console.log(`📊 Added ${result.value.length} jobs from ${platforms[index]}`);
+      } else if (result.status === 'rejected') {
+        console.error(`⚠️ Platform ${platforms[index]} search was rejected:`, result.reason);
+      }
+    });
+    
+  } else {
+    // Single platform search - use existing sequential approach
+    console.log(`🔍 Running single platform search on: ${site}`);
+    try {
+      const jobs = await scrapeJobsFromPlatform(query, site, location);
+      console.log(`✅ Found ${jobs.length} jobs from ${site}`);
+      allJobs.push(...jobs);
     } catch (error) {
-      console.error(`Failed to scrape ${platform}:`, error);
-      // Continue with other platforms even if one fails
+      console.error(`❌ Failed to scrape ${site}:`, error);
     }
   }
   
-  console.log(`Total jobs found before deduplication: ${allJobs.length}`);
+  console.log(`📈 Total jobs found before deduplication: ${allJobs.length}`);
   
   // Remove duplicates based on URL
   const uniqueJobs = allJobs.filter((job, index, self) => 
     index === self.findIndex(j => j.url === job.url)
   );
   
-  console.log(`Total unique jobs after deduplication: ${uniqueJobs.length}`);
+  console.log(`✨ Total unique jobs after deduplication: ${uniqueJobs.length}`);
   return uniqueJobs;
 }
 
@@ -550,15 +582,25 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     }
 
     const jobs: InsertJob[] = [];
-    // Scrape all available job links, no limit
-    const scrapePromises = allJobLinks.map(link => scrapeJobDetails(link));
-
-    const results = await Promise.allSettled(scrapePromises);
-    results.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) {
-        jobs.push(result.value);
+    
+    // Process links in smaller batches to avoid overwhelming the system
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < allJobLinks.length; i += BATCH_SIZE) {
+      const batch = allJobLinks.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(link => scrapeJobDetails(link));
+      
+      const batchResults = await Promise.allSettled(batchPromises);
+      batchResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          jobs.push(result.value);
+        }
+      });
+      
+      // Small delay between batches to be respectful
+      if (i + BATCH_SIZE < allJobLinks.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
-    });
+    }
 
     console.log(`Successfully scraped ${jobs.length} jobs from ${site}`);
     return jobs;
