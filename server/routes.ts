@@ -71,6 +71,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function buildSearchQuery(query: string, site: string, location: string = "all"): string {
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
+  // Always wrap query in quotes for exact matching
+  const quotedQuery = `"${query}"`;
+  
   // Detect if this is a leadership/executive search
   const isExecutiveRole = query.toLowerCase().includes('director') || 
                           query.toLowerCase().includes('cto') || 
@@ -90,23 +93,23 @@ function buildSearchQuery(query: string, site: string, location: string = "all")
   
   switch (site) {
     case "boards.greenhouse.io":
-      return `site:boards.greenhouse.io "${query}"${locationFilter}${jobKeywords}`;
+      return `site:boards.greenhouse.io ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "jobs.lever.co":
-      return `site:jobs.lever.co "${query}"${locationFilter}${jobKeywords}`;
+      return `site:jobs.lever.co ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "jobs.ashbyhq.com":
-      return `site:jobs.ashbyhq.com "${query}"${locationFilter}${jobKeywords}`;
+      return `site:jobs.ashbyhq.com ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "jobs.workable.com":
-      return `site:jobs.workable.com "${query}"${locationFilter}${jobKeywords}`;
+      return `site:jobs.workable.com ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "myworkdayjobs.com":
-      return `site:myworkdayjobs.com "${query}"${locationFilter}${jobKeywords}`;
+      return `site:myworkdayjobs.com ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "adp":
-      return `(site:workforcenow.adp.com OR site:myjobs.adp.com) "${query}"${locationFilter}${jobKeywords}`;
+      return `(site:workforcenow.adp.com OR site:myjobs.adp.com) ${quotedQuery}${locationFilter}${jobKeywords}`;
     case "careers.*":
-      return `"${query}" (inurl:careers OR inurl:career OR inurl:jobs) -inurl:blog -inurl:news${locationFilter}`;
+      return `${quotedQuery} (inurl:careers OR inurl:career OR inurl:jobs) -inurl:blog -inurl:news${locationFilter}`;
     case "other-pages":
-      return `"${query}" (inurl:employment OR inurl:opportunities OR inurl:openings OR inurl:apply) -inurl:blog${locationFilter}`;
+      return `${quotedQuery} (inurl:employment OR inurl:opportunities OR inurl:openings OR inurl:apply) -inurl:blog${locationFilter}`;
     default:
-      return `site:${site} "${query}"${locationFilter}${jobKeywords}`;
+      return `site:${site} ${quotedQuery}${locationFilter}${jobKeywords}`;
   }
 }
 
