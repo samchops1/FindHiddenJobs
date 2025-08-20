@@ -68,43 +68,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-function buildSearchUrl(query: string, site: string, location: string = "all"): string {
-  // Use quoted search terms for more precise results
-  const quotedQuery = encodeURIComponent(`"${query}"`);
-  const broadQuery = encodeURIComponent(query);
+function buildSearchQuery(query: string, site: string, location: string = "all"): string {
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
   switch (site) {
-    case "linkedin.com":
-      const linkedinLocation = location === "remote" ? "Remote" : "";
-      return `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${linkedinLocation}`;
     case "boards.greenhouse.io":
-      // Try both quoted and unquoted for better results
-      const greenhouseQuery = `${broadQuery} site:boards.greenhouse.io ${locationFilter}`;
-      return `https://www.google.com/search?q=${greenhouseQuery}&hl=en&num=100`;
+      return `"${query}" site:boards.greenhouse.io${locationFilter}`;
     case "jobs.lever.co":
-      const leverQuery = `${broadQuery} site:jobs.lever.co ${locationFilter}`;
-      return `https://www.google.com/search?q=${leverQuery}&hl=en&num=100`;
+      return `"${query}" site:jobs.lever.co${locationFilter}`;
     case "jobs.ashbyhq.com":
-      const ashbyQuery = `${broadQuery} site:jobs.ashbyhq.com ${locationFilter}`;
-      return `https://www.google.com/search?q=${ashbyQuery}&hl=en&num=100`;
+      return `"${query}" site:jobs.ashbyhq.com${locationFilter}`;
     case "jobs.workable.com":
-      const workableQuery = `${broadQuery} site:jobs.workable.com ${locationFilter}`;
-      return `https://www.google.com/search?q=${workableQuery}&hl=en&num=100`;
+      return `"${query}" site:jobs.workable.com${locationFilter}`;
     case "myworkdayjobs.com":
-      const workdayQuery = `${broadQuery} site:myworkdayjobs.com ${locationFilter}`;
-      return `https://www.google.com/search?q=${workdayQuery}&hl=en&num=100`;
+      return `"${query}" site:myworkdayjobs.com${locationFilter}`;
     case "adp":
-      const adpQuery = `${broadQuery} site:workforcenow.adp.com OR site:myjobs.adp.com${locationFilter}`;
-      return `https://www.google.com/search?q=${adpQuery}&hl=en&num=100`;
+      return `"${query}" (site:workforcenow.adp.com OR site:myjobs.adp.com)${locationFilter}`;
     case "careers.*":
-      const careersQuery = `${quotedQuery} inurl:careers OR inurl:career${locationFilter}`;
-      return `https://www.google.com/search?q=${careersQuery}&hl=en&num=100`;
+      return `"${query}" (inurl:careers OR inurl:career)${locationFilter}`;
     case "other-pages":
-      const otherQuery = `${quotedQuery} inurl:employment OR inurl:opportunities OR inurl:openings${locationFilter}`;
-      return `https://www.google.com/search?q=${otherQuery}&hl=en&num=100`;
+      return `"${query}" (inurl:employment OR inurl:opportunities OR inurl:openings)${locationFilter}`;
     default:
-      return `https://www.google.com/search?q=${quotedQuery} site:${site}${locationFilter}&hl=en&num=100`;
+      return `"${query}" site:${site}${locationFilter}`;
+  }
+}
+
+async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
+  const API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
+  const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
+  
+  if (!API_KEY || !SEARCH_ENGINE_ID) {
+    console.error('Missing Google Search API credentials');
+    return [];
+  }
+  
+  try {
+    const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Google Search API error: ${response.status} - ${errorText}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    
+    if (!data.items) {
+      console.log('No search results found');
+      return [];
+    }
+    
+    // Extract job-related URLs from search results
+    const jobLinks: string[] = [];
+    
+    data.items.forEach((item: any) => {
+      const link = item.link;
+      if (link && (
+        link.includes('jobs.lever.co') || 
+        link.includes('boards.greenhouse.io') || 
+        link.includes('jobs.ashbyhq.com') ||
+        link.includes('myworkdayjobs.com') ||
+        link.includes('jobs.workable.com') ||
+        link.includes('workforcenow.adp.com') ||
+        link.includes('myjobs.adp.com') ||
+        link.includes('/careers/') ||
+        link.includes('/career/') ||
+        link.includes('/employment/') ||
+        link.includes('/opportunities/') ||
+        link.includes('/openings/')
+      )) {
+        jobLinks.push(link);
+      }
+    });
+    
+    console.log(`Google API returned ${data.items.length} results, ${jobLinks.length} job-related links`);
+    return jobLinks;
+    
+  } catch (error) {
+    console.error('Google Search API error:', error);
+    return [];
   }
 }
 
@@ -261,168 +305,20 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
 
 async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    const searchUrl = buildSearchUrl(query, site, location);
-    console.log(`Searching URL: ${searchUrl}`);
+    const searchQuery = buildSearchQuery(query, site, location);
+    console.log(`Searching with Google API: ${searchQuery}`);
     
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-      }
-    });
+    const jobLinks = await searchWithGoogleAPI(searchQuery);
+    console.log(`Found ${jobLinks.length} job links for ${site}`);
     
-    if (!searchResponse.ok) {
-      throw new Error(`Search failed: HTTP ${searchResponse.status}`);
-    }
-    
-    const searchHtml = await searchResponse.text();
-    const $ = cheerio.load(searchHtml);
-
-    const jobLinks = new Set<string>();
-    
-    // Extract job links from Google search results - handle multiple formats
-    $('a').each((i, element) => {
-      const href = $(element).attr('href');
-      if (!href) return;
-      
-      let cleanUrl = '';
-      
-      // Handle /url?q= format
-      if (href.startsWith('/url?q=')) {
-        try {
-          const url = new URL(`https://google.com${href}`);
-          cleanUrl = url.searchParams.get('q') || '';
-        } catch (urlError) {
-          return;
-        }
-      }
-      // Handle direct URLs (newer Google format)
-      else if (href.startsWith('http')) {
-        cleanUrl = href;
-      }
-      // Handle relative URLs
-      else if (href.startsWith('/')) {
-        return; // Skip internal Google links
-      }
-      
-      // Check if this is a job-related URL
-      if (cleanUrl && (
-        cleanUrl.includes('jobs.lever.co') || 
-        cleanUrl.includes('boards.greenhouse.io') || 
-        cleanUrl.includes('jobs.ashbyhq.com') ||
-        cleanUrl.includes('myworkdayjobs.com') ||
-        cleanUrl.includes('jobs.workable.com') ||
-        cleanUrl.includes('workforcenow.adp.com') ||
-        cleanUrl.includes('myjobs.adp.com') ||
-        cleanUrl.includes('/careers/') ||
-        cleanUrl.includes('/career/') ||
-        cleanUrl.includes('/employment/') ||
-        cleanUrl.includes('/opportunities/') ||
-        cleanUrl.includes('/openings/')
-      )) {
-        // Remove Google tracking parameters
-        try {
-          const cleanedUrl = new URL(cleanUrl);
-          cleanedUrl.searchParams.delete('ved');
-          cleanedUrl.searchParams.delete('usg');
-          cleanedUrl.searchParams.delete('sa');
-          jobLinks.add(cleanedUrl.toString());
-        } catch {
-          jobLinks.add(cleanUrl);
-        }
-      }
-    });
-    
-    // Debug: Log first few links found to understand what Google is returning
-    if (jobLinks.size === 0) {
-      console.log(`No job links found. Checking all links found on page for ${site}:`);
-      let linkCount = 0;
-      $('a').each((i, element) => {
-        if (linkCount >= 10) return false; // Log first 10 for debugging
-        const href = $(element).attr('href');
-        if (href) {
-          console.log(`  Link ${linkCount + 1}: ${href}`);
-          linkCount++;
-        }
-      });
-      
-      // Also check if Google is blocking us
-      const title = $('title').text();
-      console.log(`Page title: ${title}`);
-      if (title.toLowerCase().includes('unusual traffic') || title.toLowerCase().includes('blocked')) {
-        console.log('Google may be blocking our requests due to unusual traffic');
-      }
-    }
-
-    console.log(`Found ${jobLinks.size} job links for ${site}`);
-    
-    // If no results with site-specific search, try a broader approach for ATS platforms
-    if (jobLinks.size === 0 && (site.includes('greenhouse.io') || site.includes('lever.co') || site.includes('ashbyhq.com') || site.includes('workable.com') || site.includes('workday'))) {
-      console.log(`Trying broader search for ${site}...`);
-      const broadSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)} jobs ${site.split('.')[0]}&hl=en&num=100`;
-      console.log(`Broader search URL: ${broadSearchUrl}`);
-      
-      try {
-        const broadResponse = await fetch(broadSearchUrl, {
-          headers: { 
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-          }
-        });
-        
-        if (broadResponse.ok) {
-          const broadHtml = await broadResponse.text();
-          const $broad = cheerio.load(broadHtml);
-          
-          $broad('a').each((i, element) => {
-            const href = $broad(element).attr('href');
-            if (!href) return;
-            
-            let cleanUrl = '';
-            if (href.startsWith('/url?q=')) {
-              try {
-                const url = new URL(`https://google.com${href}`);
-                cleanUrl = url.searchParams.get('q') || '';
-              } catch (urlError) {
-                return;
-              }
-            } else if (href.startsWith('http')) {
-              cleanUrl = href;
-            } else {
-              return;
-            }
-            
-            if (cleanUrl && cleanUrl.includes(site)) {
-              jobLinks.add(cleanUrl);
-            }
-          });
-          
-          console.log(`Broader search found ${jobLinks.size} additional job links for ${site}`);
-        }
-      } catch (error) {
-        console.log(`Broader search failed for ${site}:`, error);
-      }
-    }
-    
-    if (jobLinks.size === 0) {
+    if (jobLinks.length === 0) {
       console.log(`No job links found for ${site}`);
       return [];
     }
 
     const jobs: InsertJob[] = [];
-    const linksArray = Array.from(jobLinks);
     // Scrape all available job links, no limit
-    const scrapePromises = linksArray.map(link => scrapeJobDetails(link));
+    const scrapePromises = jobLinks.map(link => scrapeJobDetails(link));
 
     const results = await Promise.allSettled(scrapePromises);
     results.forEach(result => {
