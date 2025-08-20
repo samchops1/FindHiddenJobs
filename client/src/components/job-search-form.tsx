@@ -36,6 +36,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
   const quickSearchTerms = [
     "Frontend Developer",
     "Product Manager", 
+    "Director",
+    "Engineering Manager",
     "Data Scientist",
     "UX Designer"
   ];

@@ -71,8 +71,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 function buildSearchQuery(query: string, site: string, location: string = "all"): string {
   const locationFilter = location === "remote" ? " remote" : location === "onsite" ? " onsite" : "";
   
-  // Add job-specific keywords to improve relevance
-  const jobKeywords = " (job OR jobs OR hiring OR career OR position OR opening OR opportunity)";
+  // Detect if this is a leadership/executive search
+  const isExecutiveRole = query.toLowerCase().includes('director') || 
+                          query.toLowerCase().includes('cto') || 
+                          query.toLowerCase().includes('ceo') || 
+                          query.toLowerCase().includes('vp') || 
+                          query.toLowerCase().includes('head of') ||
+                          query.toLowerCase().includes('chief') ||
+                          query.toLowerCase().includes('executive') ||
+                          query.toLowerCase().includes('lead') ||
+                          query.toLowerCase().includes('manager') ||
+                          query.toLowerCase().includes('principal');
+  
+  // Use broader keywords for executive roles, more specific for others
+  const jobKeywords = isExecutiveRole ? 
+    " (position OR role OR opportunity OR opening)" : 
+    " (job OR jobs OR hiring OR career OR position OR opening OR opportunity)";
   
   switch (site) {
     case "boards.greenhouse.io":
@@ -218,73 +232,6 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1):
   }
 }
 
-function createFallbackJob(link: string): InsertJob | null {
-  try {
-    const url = new URL(link);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    
-    // Try to extract company and job info from URL
-    let company = '';
-    let title = 'Software Engineer Position';
-    let platform = 'Unknown';
-    
-    // Detect platform
-    if (url.hostname.includes('greenhouse.io')) {
-      platform = 'Greenhouse';
-      company = pathParts[0] || 'Company';
-      // Often the job ID or slug is in the path
-      if (pathParts.length > 1) {
-        const jobSlug = pathParts[pathParts.length - 1];
-        // Try to make a readable title from slug
-        title = jobSlug.replace(/-/g, ' ').replace(/_/g, ' ')
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        // Remove job IDs if present
-        title = title.replace(/\d{5,}/g, '').trim() || 'Software Engineer Position';
-      }
-    } else if (url.hostname.includes('lever.co')) {
-      platform = 'Lever';
-      company = pathParts[0] || 'Company';
-    } else if (url.hostname.includes('ashbyhq.com')) {
-      platform = 'Ashby';
-      company = pathParts[0] || 'Company';
-    } else if (url.hostname.includes('myworkdayjobs.com')) {
-      platform = 'Workday';
-      // Extract company from subdomain
-      const subdomain = url.hostname.split('.')[0];
-      company = subdomain.charAt(0).toUpperCase() + subdomain.slice(1);
-    } else if (url.hostname.includes('workable.com')) {
-      platform = 'Workable';
-    } else {
-      // Try to extract company from domain
-      company = url.hostname.replace('www.', '').split('.')[0];
-      company = company.charAt(0).toUpperCase() + company.slice(1);
-    }
-    
-    // Clean up company name
-    company = company.replace(/-/g, ' ').replace(/_/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    const cleanCompany = company.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    
-    return {
-      title,
-      company: company || 'Company',
-      location: 'See job posting',
-      description: null,
-      url: link,
-      logo: cleanCompany ? `https://logo.clearbit.com/${cleanCompany}.com` : null,
-      platform,
-      tags: ['Software Engineer']
-    };
-  } catch (error) {
-    console.error(`Failed to create fallback job for ${link}:`, error);
-    return null;
-  }
-}
 
 async function testSimpleQuery(API_KEY: string, SEARCH_ENGINE_ID: string): Promise<string[]> {
   try {
@@ -333,11 +280,8 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      // For 403/404 errors, return basic info from URL instead of failing completely
-      if (response.status === 403 || response.status === 404 || response.status === 410) {
-        return createFallbackJob(link);
-      }
-      throw new Error(`HTTP ${response.status}`);
+      // Don't return fallback data - just return null for failed scrapes
+      return null;
     }
     
     const html = await response.text();
@@ -453,11 +397,11 @@ async function scrapeJobDetails(link: string): Promise<InsertJob | null> {
     }
     
     console.log(`❌ Could not extract job details from ${link}`);
-    return createFallbackJob(link);
+    return null;
   } catch (error) {
     console.error(`Error scraping ${link}:`, error);
-    // Try to return fallback data instead of null
-    return createFallbackJob(link);
+    // Don't return fallback data - just return null for failed scrapes
+    return null;
   }
 }
 
