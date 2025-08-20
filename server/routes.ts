@@ -102,14 +102,32 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
     return [];
   }
   
+  console.log(`API Key exists: ${!!API_KEY}`);
+  console.log(`Search Engine ID: ${SEARCH_ENGINE_ID}`);
+  
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10`;
+    console.log(`API URL: ${url.replace(API_KEY, 'HIDDEN_KEY')}`);
     
     const response = await fetch(url);
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Google Search API error: ${response.status} - ${errorText}`);
+      
+      // Try a simple test query to check credentials
+      if (searchQuery.includes('site:')) {
+        console.log('Trying simple test query without site operators...');
+        const testUrl = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent('director jobs')}&num=5`;
+        const testResponse = await fetch(testUrl);
+        if (testResponse.ok) {
+          console.log('Simple query works, issue with search operators');
+        } else {
+          const testError = await testResponse.text();
+          console.error(`Test query also failed: ${testResponse.status} - ${testError}`);
+        }
+      }
+      
       return [];
     }
     
