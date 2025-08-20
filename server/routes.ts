@@ -98,34 +98,30 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
   const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
   
   if (!API_KEY || !SEARCH_ENGINE_ID) {
-    console.error('Missing Google Search API credentials');
+    console.error('❌ Missing Google Search API credentials');
+    console.error(`API Key exists: ${!!API_KEY}`);
+    console.error(`Search Engine ID exists: ${!!SEARCH_ENGINE_ID}`);
     return [];
   }
   
-  console.log(`API Key exists: ${!!API_KEY}`);
-  console.log(`Search Engine ID: ${SEARCH_ENGINE_ID}`);
+  console.log(`✅ API Key exists: ${!!API_KEY} (length: ${API_KEY.length})`);
+  console.log(`✅ Search Engine ID: ${SEARCH_ENGINE_ID}`);
   
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10`;
-    console.log(`API URL: ${url.replace(API_KEY, 'HIDDEN_KEY')}`);
+    console.log(`🌐 API URL: ${url.replace(API_KEY, 'HIDDEN_KEY')}`);
     
     const response = await fetch(url);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Google Search API error: ${response.status} - ${errorText}`);
+      console.error(`❌ Google Search API error: ${response.status}`);
+      console.error(`❌ Error details: ${errorText}`);
       
-      // Try a simple test query to check credentials
-      if (searchQuery.includes('site:')) {
-        console.log('Trying simple test query without site operators...');
-        const testUrl = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent('director jobs')}&num=5`;
-        const testResponse = await fetch(testUrl);
-        if (testResponse.ok) {
-          console.log('Simple query works, issue with search operators');
-        } else {
-          const testError = await testResponse.text();
-          console.error(`Test query also failed: ${testResponse.status} - ${testError}`);
-        }
+      // If it's a complex query, try a simple test
+      if (searchQuery.includes('site:') || searchQuery.includes('inurl:')) {
+        console.log('🔄 Complex query failed, trying simple test query...');
+        return await testSimpleQuery(API_KEY, SEARCH_ENGINE_ID);
       }
       
       return [];
@@ -167,11 +163,35 @@ async function searchWithGoogleAPI(searchQuery: string): Promise<string[]> {
       }
     });
     
-    console.log(`Google API returned ${data.items.length} results, ${jobLinks.length} job-related links`);
+    console.log(`✅ Google API returned ${data.items.length} total results, ${jobLinks.length} job-related links`);
     return jobLinks;
     
   } catch (error) {
-    console.error('Google Search API error:', error);
+    console.error('❌ Google Search API network error:', error);
+    return [];
+  }
+}
+
+async function testSimpleQuery(API_KEY: string, SEARCH_ENGINE_ID: string): Promise<string[]> {
+  try {
+    console.log('🧪 Testing with very simple query: "jobs"');
+    const testUrl = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=jobs&num=3`;
+    const testResponse = await fetch(testUrl);
+    
+    if (testResponse.ok) {
+      const testData = await testResponse.json() as { items?: Array<{ link: string }> };
+      console.log(`✅ Simple test query succeeded! Found ${testData.items?.length || 0} results`);
+      if (testData.items && testData.items.length > 0) {
+        console.log(`📋 Sample result: ${testData.items[0].link}`);
+      }
+      return [];
+    } else {
+      const testError = await testResponse.text();
+      console.error(`❌ Even simple test query failed: ${testResponse.status} - ${testError}`);
+      return [];
+    }
+  } catch (error) {
+    console.error('❌ Test query network error:', error);
     return [];
   }
 }
@@ -329,10 +349,22 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
 
 async function scrapeJobsFromPlatform(query: string, site: string, location: string): Promise<InsertJob[]> {
   try {
-    const searchQuery = buildSearchQuery(query, site, location);
-    console.log(`Searching with Google API: ${searchQuery}`);
+    // Test basic Google API first
+    console.log(`\n🔍 Testing Google API for platform: ${site}`);
     
-    const jobLinks = await searchWithGoogleAPI(searchQuery);
+    // Try simple query first
+    const simpleQuery = `${query} jobs`;
+    console.log(`Testing with simple query: ${simpleQuery}`);
+    
+    let jobLinks = await searchWithGoogleAPI(simpleQuery);
+    
+    // If simple query works but returns no relevant links, try site-specific
+    if (jobLinks.length === 0) {
+      const searchQuery = buildSearchQuery(query, site, location);
+      console.log(`Trying site-specific query: ${searchQuery}`);
+      jobLinks = await searchWithGoogleAPI(searchQuery);
+    }
+    
     console.log(`Found ${jobLinks.length} job links for ${site}`);
     
     if (jobLinks.length === 0) {
