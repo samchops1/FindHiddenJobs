@@ -40,7 +40,16 @@ export function searchJobsStreaming(
   onEvent: (event: StreamingSearchEvent) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const url = `/api/search-stream?${new URLSearchParams(searchParams as any).toString()}`;
+    // Properly convert parameters to strings for URL
+    const urlParams = new URLSearchParams({
+      query: searchParams.query,
+      site: searchParams.site,
+      location: searchParams.location || 'all',
+      timeFilter: searchParams.timeFilter || 'all',
+      page: (searchParams.page || 1).toString(),
+      limit: (searchParams.limit || 25).toString()
+    });
+    const url = `/api/search-stream?${urlParams.toString()}`;
     const eventSource = new EventSource(url);
 
     eventSource.onmessage = (event) => {

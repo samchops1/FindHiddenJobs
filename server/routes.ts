@@ -245,10 +245,20 @@ Disallow: /*.css$`);
     } catch (error) {
       console.error('Search error:', error);
       
-      // Return partial results if available
-      res.status(500).json({ 
-        error: 'Search completed with errors', 
-        message: error instanceof Error ? error.message : 'Unknown error',
+      // Handle Google API quota errors specifically
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let userMessage = 'Search temporarily unavailable';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('Quota exceeded')) {
+        userMessage = 'Search quota reached. Please try again in a few minutes.';
+      } else if (errorMessage.includes('Daily limit')) {
+        userMessage = 'Daily search limit reached. The limit will reset tomorrow.';
+      }
+      
+      // Return user-friendly error
+      res.status(503).json({ 
+        error: 'Search temporarily unavailable',
+        message: userMessage,
         jobs: [],
         pagination: {
           currentPage: 1,
@@ -296,8 +306,22 @@ Disallow: /*.css$`);
       
     } catch (error) {
       console.error('Streaming search error:', error);
+      
+      // Handle different types of errors
+      let errorMessage = 'Search temporarily unavailable';
+      const originalError = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (originalError.includes('429') || originalError.includes('Quota exceeded')) {
+        errorMessage = 'Search quota reached. Please try again in a few minutes.';
+      } else if (originalError.includes('Daily limit')) {
+        errorMessage = 'Daily search limit reached. The limit will reset tomorrow.';
+      }
+      
       res.write(`event: error\n`);
-      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ 
+        error: errorMessage, 
+        code: originalError.includes('429') ? 'QUOTA_EXCEEDED' : 'SEARCH_ERROR'
+      })}\n\n`);
       res.end();
     }
   });
