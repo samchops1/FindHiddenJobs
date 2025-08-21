@@ -335,8 +335,8 @@ export default function Home() {
           {/* Job Results */}
           {jobs.length > 0 && (
             <div className="space-y-4" data-testid="job-results">
-              {jobs.map((job) => (
-                <JobCardEnhanced key={job.url} job={job} />
+              {jobs.map((job, index) => (
+                <JobCardEnhanced key={`${job.url}-${index}`} job={job} />
               ))}
             </div>
           )}

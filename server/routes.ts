@@ -91,11 +91,12 @@ Disallow: /*.css$`);
       console.log(`🔍 Parsed query params:`, queryParams);
       
       const { query, site, location, timeFilter, page, limit } = searchRequestSchema.parse(queryParams);
+      const normalizedTimeFilter = timeFilter || 'all';
       
-      console.log(`✅ Schema validation passed: query="${query}", site="${site}", location="${location}", timeFilter="${timeFilter || 'none'}"`);
+      console.log(`✅ Schema validation passed: query="${query}", site="${site}", location="${location}", timeFilter="${normalizedTimeFilter}"`);
       
       // Create cache key for this search (excluding page number)
-      const cacheKey = `${query}:${site}:${location}:${timeFilter || 'all'}`;
+      const cacheKey = `${query}:${site}:${location}:${normalizedTimeFilter}`;
       const cachedResult = jobSearchCache.get(cacheKey);
       
       let allJobs;
@@ -115,7 +116,7 @@ Disallow: /*.css$`);
         });
 
         // Use graceful search with rate limit handling
-        allJobs = await scrapeJobsFromAllPlatformsGraceful(query, site, location, (timeFilter || 'all') as string, false);
+        allJobs = await scrapeJobsFromAllPlatformsGraceful(query, site, location, normalizedTimeFilter, false);
         
         // Store scraped jobs
         for (const jobData of allJobs) {
@@ -195,6 +196,7 @@ Disallow: /*.css$`);
   app.get('/api/search-stream', async (req, res) => {
     try {
       const { query, site, location, timeFilter } = searchRequestSchema.parse(req.query);
+      const normalizedTimeFilter = timeFilter || 'all';
       
       // Set up Server-Sent Events
       res.setHeader('Content-Type', 'text/event-stream');
@@ -210,7 +212,7 @@ Disallow: /*.css$`);
       sendEvent('start', { message: 'Search started', query, site, location });
       
       const jobs = await scrapeJobsFromAllPlatformsStreaming(
-        query, site, location, (timeFilter || 'all') as string, sendEvent
+        query, site, location, normalizedTimeFilter, sendEvent
       );
       
       sendEvent('complete', { totalJobs: jobs.length });
