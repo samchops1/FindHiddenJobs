@@ -123,7 +123,7 @@ export class JobRecommendationEngine {
         const jobs = await scrapeJobsFromAllPlatforms(
           jobType,
           'all', // Search all platforms
-          userProfile.preferredLocation || 'all',
+          userProfile.preferredLocation?.toLowerCase() || 'all',
           undefined, // No time filter
           true // Email recommendation mode - use 1s rate limiting
         );
@@ -142,7 +142,7 @@ export class JobRecommendationEngine {
           const jobs = await scrapeJobsFromAllPlatforms(
             skill,
             'all',
-            userProfile.preferredLocation || 'all',
+            userProfile.preferredLocation?.toLowerCase() || 'all',
             undefined, // No time filter
             true // Email recommendation mode - use 1s rate limiting
           );
