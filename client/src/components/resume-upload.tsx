@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -13,9 +13,48 @@ export function ResumeUpload({ onAnalysisComplete }: ResumeUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Load existing resume analysis on mount
+  useEffect(() => {
+    if (user && !analysisResult) {
+      loadExistingResume();
+    }
+  }, [user]);
+
+  const loadExistingResume = async () => {
+    if (!user) return;
+    
+    setIsLoadingExisting(true);
+    try {
+      const response = await fetch('/api/user/resume/analysis', {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasResume) {
+          setAnalysisResult(data.analysis);
+          // Create a mock file object to show in the UI
+          const mockFile = new File([''], data.fileName, { type: 'application/pdf' });
+          setUploadedFile(mockFile);
+          
+          if (onAnalysisComplete) {
+            onAnalysisComplete(data.analysis);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load existing resume:', error);
+    } finally {
+      setIsLoadingExisting(false);
+    }
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -112,6 +151,23 @@ export function ResumeUpload({ onAnalysisComplete }: ResumeUploadProps) {
           <p className="text-muted-foreground">
             Sign in to upload your resume and get personalized job recommendations.
           </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoadingExisting) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Upload className="w-5 h-5" />
+            <span>Resume Analysis</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading your resume...</p>
         </CardContent>
       </Card>
     );

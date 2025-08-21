@@ -226,6 +226,33 @@ Disallow: /*.css$`);
     }
   });
 
+  // Get user's existing resume analysis
+  app.get('/api/user/resume/analysis', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
+      
+      if (resumeAnalysis) {
+        res.json({
+          hasResume: true,
+          fileName: resumeAnalysis.fileName,
+          analysis: resumeAnalysis.analysis,
+          analyzedAt: resumeAnalysis.analyzedAt
+        });
+      } else {
+        res.json({ hasResume: false });
+      }
+    } catch (error) {
+      console.error('Error fetching resume analysis:', error);
+      res.status(500).json({ error: 'Failed to fetch resume analysis' });
+    }
+  });
+
   // Simple test endpoint
   app.get('/api/test', (req, res) => {
     res.json({ message: 'API is working', timestamp: new Date().toISOString() });
