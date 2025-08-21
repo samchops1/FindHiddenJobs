@@ -14,7 +14,10 @@
       "Bash(/bashes)",
       "Bash(curl:*)",
       "WebFetch(domain:briansjobsearch.com)",
-      "WebFetch(domain:)"
+      "WebFetch(domain:)",
+      "Bash(npm install:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

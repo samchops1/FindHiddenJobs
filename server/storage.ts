@@ -9,15 +9,118 @@ export interface IStorage {
   getRecentSearches(): Promise<Search[]>;
   createSearch(search: InsertSearch): Promise<Search>;
   clearOldJobs(): Promise<void>;
+  
+  // User preferences
+  saveUserPreferences(preferences: {
+    userId: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+  }): Promise<void>;
+  
+  getUserPreferences(userId: string): Promise<{
+    userId: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+  } | undefined>;
+  
+  // Saved jobs
+  saveJob(jobData: {
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    jobData?: any;
+  }): Promise<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    savedAt: Date;
+  }>;
+  
+  getUserSavedJobs(userId: string): Promise<Array<{
+    id: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    savedAt: Date;
+    applied: boolean;
+  }>>;
+  
+  // Job applications
+  trackApplication(applicationData: {
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    notes?: string;
+  }): Promise<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    notes?: string;
+  }>;
+  
+  getUserApplications(userId: string): Promise<Array<{
+    id: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    status: string;
+    notes?: string;
+  }>>;
+  
+  // Resume analysis
+  saveResumeAnalysis(data: {
+    userId: string;
+    fileName: string;
+    fileUrl: string;
+    analysis: any;
+  }): Promise<{
+    id: string;
+    userId: string;
+    fileName: string;
+    fileUrl: string;
+    analysis: any;
+    analyzedAt: Date;
+  }>;
+  
+  getUserResumeAnalysis(userId: string): Promise<{
+    id: string;
+    fileName: string;
+    analysis: any;
+    analyzedAt: Date;
+  } | undefined>;
 }
 
 export class MemStorage implements IStorage {
   private jobs: Map<string, Job>;
   private searches: Map<string, Search>;
+  private userPreferences: Map<string, any>;
+  private savedJobs: Map<string, any>;
+  private applications: Map<string, any>;
+  private resumeAnalyses: Map<string, any>;
 
   constructor() {
     this.jobs = new Map();
     this.searches = new Map();
+    this.userPreferences = new Map();
+    this.savedJobs = new Map();
+    this.applications = new Map();
+    this.resumeAnalyses = new Map();
   }
 
   async getJob(id: string): Promise<Job | undefined> {
@@ -81,6 +184,177 @@ export class MemStorage implements IStorage {
     }
     entriesToDelete.forEach(id => this.jobs.delete(id));
   }
+
+  // User preferences implementation
+  async saveUserPreferences(preferences: {
+    userId: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+  }): Promise<void> {
+    this.userPreferences.set(preferences.userId, {
+      ...preferences,
+      updatedAt: new Date()
+    });
+  }
+
+  async getUserPreferences(userId: string): Promise<{
+    userId: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+  } | undefined> {
+    return this.userPreferences.get(userId);
+  }
+
+  // Saved jobs implementation
+  async saveJob(jobData: {
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    jobData?: any;
+  }): Promise<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    savedAt: Date;
+  }> {
+    const id = randomUUID();
+    const savedJob = {
+      id,
+      ...jobData,
+      savedAt: new Date(),
+      applied: false
+    };
+    this.savedJobs.set(id, savedJob);
+    return savedJob;
+  }
+
+  async getUserSavedJobs(userId: string): Promise<Array<{
+    id: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    location?: string;
+    platform?: string;
+    savedAt: Date;
+    applied: boolean;
+  }>> {
+    return Array.from(this.savedJobs.values())
+      .filter(job => job.userId === userId)
+      .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime());
+  }
+
+  // Job applications implementation
+  async trackApplication(applicationData: {
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    notes?: string;
+  }): Promise<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    notes?: string;
+  }> {
+    const id = randomUUID();
+    const application = {
+      id,
+      ...applicationData,
+      appliedAt: new Date(),
+      status: 'applied'
+    };
+    this.applications.set(id, application);
+    
+    // Mark corresponding saved job as applied if it exists
+    Array.from(this.savedJobs.entries()).forEach(([jobId, savedJob]) => {
+      if (savedJob.userId === applicationData.userId && savedJob.jobUrl === applicationData.jobUrl) {
+        savedJob.applied = true;
+        savedJob.appliedAt = application.appliedAt;
+        this.savedJobs.set(jobId, savedJob);
+      }
+    });
+    
+    return application;
+  }
+
+  async getUserApplications(userId: string): Promise<Array<{
+    id: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    status: string;
+    notes?: string;
+  }>> {
+    return Array.from(this.applications.values())
+      .filter(app => app.userId === userId)
+      .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
+  }
+
+  // Resume analysis implementation
+  async saveResumeAnalysis(data: {
+    userId: string;
+    fileName: string;
+    fileUrl: string;
+    analysis: any;
+  }): Promise<{
+    id: string;
+    userId: string;
+    fileName: string;
+    fileUrl: string;
+    analysis: any;
+    analyzedAt: Date;
+  }> {
+    const id = randomUUID();
+    const resumeAnalysis = {
+      id,
+      ...data,
+      analyzedAt: new Date()
+    };
+    
+    // Store with user ID as key so we can easily find the latest analysis per user
+    this.resumeAnalyses.set(`${data.userId}_${id}`, resumeAnalysis);
+    
+    return resumeAnalysis;
+  }
+
+  async getUserResumeAnalysis(userId: string): Promise<{
+    id: string;
+    fileName: string;
+    analysis: any;
+    analyzedAt: Date;
+  } | undefined> {
+    // Find the latest resume analysis for the user
+    const userAnalyses = Array.from(this.resumeAnalyses.entries())
+      .filter(([key, analysis]) => key.startsWith(`${userId}_`))
+      .map(([key, analysis]) => analysis)
+      .sort((a, b) => b.analyzedAt.getTime() - a.analyzedAt.getTime());
+    
+    const latest = userAnalyses[0];
+    if (!latest) return undefined;
+    
+    return {
+      id: latest.id,
+      fileName: latest.fileName,
+      analysis: latest.analysis,
+      analyzedAt: latest.analyzedAt
+    };
+  }
 }
 
-export const storage = new MemStorage();
+import { supabaseStorage } from './supabase-storage';
+
+// Use Supabase storage if available, otherwise fall back to in-memory storage
+export const storage = process.env.SUPABASE_URL ? supabaseStorage : new MemStorage();

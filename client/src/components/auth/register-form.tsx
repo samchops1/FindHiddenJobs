@@ -4,16 +4,23 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Briefcase, MapPin, Bell } from 'lucide-react';
 
 const registerSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
+  jobTypes: z.array(z.string()).min(1, 'Please select at least one job type'),
+  preferredLocation: z.string().optional(),
+  emailNotifications: z.boolean().default(true),
+  agreeToTerms: z.boolean().refine((val) => val === true, {
+    message: 'You must agree to the terms of service and privacy policy',
+  }),
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -22,9 +29,23 @@ interface RegisterFormProps {
   onToggleMode: () => void;
 }
 
+const jobTypeOptions = [
+  'Software Engineer',
+  'Product Manager',
+  'Data Scientist',
+  'Designer',
+  'Marketing',
+  'Sales',
+  'Operations',
+  'Finance',
+  'HR',
+  'Other',
+];
+
 export function RegisterForm({ onToggleMode }: RegisterFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Basic info, 2: Preferences
   const { signUp } = useAuth();
   const { toast } = useToast();
 
@@ -35,6 +56,10 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
       password: '',
       firstName: '',
       lastName: '',
+      jobTypes: [],
+      preferredLocation: '',
+      emailNotifications: true,
+      agreeToTerms: false,
     },
   });
 

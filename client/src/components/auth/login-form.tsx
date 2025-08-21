@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -12,6 +13,9 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
+  acceptTerms: z.boolean().refine((val) => val === true, {
+    message: 'You must agree to the updated terms to continue',
+  }),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -31,6 +35,7 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     defaultValues: {
       email: '',
       password: '',
+      acceptTerms: false,
     },
   });
 
@@ -111,6 +116,35 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
                   </div>
                 </FormControl>
                 <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="acceptTerms"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 bg-muted/50">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="text-sm font-normal">
+                    I accept the updated{' '}
+                    <a href="/terms" target="_blank" className="text-primary hover:underline">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/privacy" target="_blank" className="text-primary hover:underline">
+                      Privacy Policy
+                    </a>
+                    , including data collection for resume analysis, job tracking, and daily email recommendations.
+                  </FormLabel>
+                  <FormMessage />
+                </div>
               </FormItem>
             )}
           />

@@ -4,6 +4,12 @@ import { storage } from "./storage";
 import { searchRequestSchema, type InsertJob } from "@shared/schema";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { recommendationScheduler } from "./scheduler";
+import { emailService } from "./email-service";
+import { resumeParser } from "./resume-parser";
 
 // Simple in-memory cache for Google API results
 const searchCache = new Map<string, { data: any; timestamp: number }>();
@@ -12,6 +18,24 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 // In-memory cache for full job search results (for pagination)
 const jobSearchCache = new Map<string, { jobs: any[]; timestamp: number }>();
 const JOB_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /\.(pdf|doc|docx)$/i;
+    const isValidType = allowedTypes.test(path.extname(file.originalname));
+    
+    if (isValidType) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, DOC, and DOCX files are allowed'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // SEO sitemap endpoint
@@ -207,9 +231,290 @@ Disallow: /*.css$`);
     }
   });
 
+  // User preferences endpoint
+  app.post('/api/user/preferences', async (req, res) => {
+    try {
+      const { jobTypes, preferredLocation, emailNotifications } = req.body;
+      
+      // In a real app, you'd get userId from authentication middleware
+      // For now, we'll use a placeholder
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      // Save user preferences to database
+      await storage.saveUserPreferences({
+        userId,
+        jobTypes: jobTypes || [],
+        preferredLocation,
+        emailNotifications: emailNotifications ?? true
+      });
+
+      res.json({ message: 'Preferences saved successfully' });
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      res.status(500).json({ error: 'Failed to save preferences' });
+    }
+  });
+
+  // Save job endpoint
+  app.post('/api/jobs/save', async (req, res) => {
+    try {
+      const { jobUrl, jobTitle, company, location, platform, jobData } = req.body;
+      
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      // Save job to database
+      const savedJob = await storage.saveJob({
+        userId,
+        jobUrl,
+        jobTitle,
+        company,
+        location,
+        platform,
+        jobData
+      });
+
+      res.json({ message: 'Job saved successfully', savedJob });
+    } catch (error) {
+      console.error('Error saving job:', error);
+      res.status(500).json({ error: 'Failed to save job' });
+    }
+  });
+
+  // Track job application
+  app.post('/api/jobs/apply', async (req, res) => {
+    try {
+      const { jobUrl, jobTitle, company, notes } = req.body;
+      
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      // Track application in database
+      const application = await storage.trackApplication({
+        userId,
+        jobUrl,
+        jobTitle,
+        company,
+        notes
+      });
+
+      res.json({ message: 'Application tracked successfully', application });
+    } catch (error) {
+      console.error('Error tracking application:', error);
+      res.status(500).json({ error: 'Failed to track application' });
+    }
+  });
+
+  // Get saved jobs for a user
+  app.get('/api/user/saved-jobs', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const savedJobs = await storage.getUserSavedJobs(userId);
+      res.json({ savedJobs });
+    } catch (error) {
+      console.error('Error fetching saved jobs:', error);
+      res.status(500).json({ error: 'Failed to fetch saved jobs' });
+    }
+  });
+
+  // Get job applications for a user
+  app.get('/api/user/applications', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const applications = await storage.getUserApplications(userId);
+      res.json({ applications });
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+  });
+
+  // Resume upload and analysis endpoint
+  app.post('/api/user/resume/upload', upload.single('resume'), async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No resume file uploaded' });
+      }
+
+      const filePath = req.file.path;
+      const fileName = req.file.originalname;
+      
+      // Use OpenAI to analyze the resume
+      const analysis = await resumeParser.parseResume(filePath, fileName);
+      
+      // Save the analysis to storage
+      await storage.saveResumeAnalysis({
+        userId,
+        fileName,
+        fileUrl: filePath,
+        analysis
+      });
+
+      // Update user preferences based on resume analysis
+      const existingPrefs = await storage.getUserPreferences(userId);
+      await storage.saveUserPreferences({
+        userId,
+        jobTypes: analysis.suggestedJobTitles || existingPrefs?.jobTypes || [],
+        preferredLocation: existingPrefs?.preferredLocation,
+        emailNotifications: existingPrefs?.emailNotifications ?? true
+      });
+
+      // Clean up uploaded file after analysis
+      try {
+        fs.unlinkSync(filePath);
+      } catch (cleanupError) {
+        console.error('Failed to clean up uploaded file:', cleanupError);
+      }
+
+      res.json({
+        message: 'Resume analyzed successfully',
+        analysis
+      });
+    } catch (error) {
+      console.error('Error analyzing resume:', error);
+      res.status(500).json({ error: 'Failed to analyze resume' });
+    }
+  });
+
+  // Test endpoint to manually trigger daily recommendations
+  app.post('/api/test/send-recommendations', async (req, res) => {
+    try {
+      console.log('🧪 Manual trigger of daily recommendations...');
+      await recommendationScheduler.sendTestRecommendations();
+      res.json({ message: 'Test recommendations sent successfully' });
+    } catch (error) {
+      console.error('Error sending test recommendations:', error);
+      res.status(500).json({ error: 'Failed to send test recommendations' });
+    }
+  });
+
+  // Feature request endpoint
+  app.post('/api/feature-request', async (req, res) => {
+    try {
+      const { type, title, description, email, name } = req.body;
+      
+      // Validate required fields
+      if (!type || !title || !description || !email || !name) {
+        return res.status(400).json({ error: 'All fields are required' });
+      }
+
+      // Send feature request email to your address
+      const featureRequestEmail = {
+        from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
+        to: 'sameer.s.chopra@gmail.com',
+        subject: `Feature Request: ${title}`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Feature Request</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+              .content { background: white; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; }
+              .meta { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 15px 0; }
+              .type-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+              .feature { background: #dbeafe; color: #1e40af; }
+              .bug { background: #fee2e2; color: #dc2626; }
+              .improvement { background: #d1fae5; color: #059669; }
+              .question { background: #e0e7ff; color: #5b21b6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 style="margin: 0;">New Feature Request</h1>
+                <p style="margin: 8px 0 0 0; color: #6b7280;">From FindHiddenJobs.com</p>
+              </div>
+              
+              <div class="content">
+                <div class="meta">
+                  <p><strong>Type:</strong> <span class="type-badge ${type}">${type.toUpperCase()}</span></p>
+                  <p><strong>From:</strong> ${name} (${email})</p>
+                  <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                
+                <h2>${title}</h2>
+                <div style="white-space: pre-wrap; background: #f9fafb; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                  ${description}
+                </div>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+                
+                <p style="font-size: 14px; color: #6b7280;">
+                  Reply to this email to respond directly to ${name} at ${email}
+                </p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+        text: `
+Feature Request: ${title}
+
+Type: ${type.toUpperCase()}
+From: ${name} (${email})
+Date: ${new Date().toLocaleString()}
+
+Description:
+${description}
+
+---
+Reply to this email to respond directly to ${name} at ${email}
+        `,
+        replyTo: email // Allow direct reply to the requester
+      };
+
+      // Send the email (will use console.log in development)
+      if (process.env.NODE_ENV === 'production') {
+        // In production, this would use a real email service
+        console.log('📧 Feature request email would be sent to sameer.s.chopra@gmail.com');
+      } else {
+        // In development, just log the email content
+        console.log('📧 Feature Request Email:');
+        console.log(JSON.stringify(featureRequestEmail, null, 2));
+      }
+
+      res.json({ message: 'Feature request submitted successfully' });
+    } catch (error) {
+      console.error('Error submitting feature request:', error);
+      res.status(500).json({ error: 'Failed to submit feature request' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
+
+// Resume analysis is now handled by the real OpenAI-powered parser
 
 function buildSearchQuery(query: string, site: string, location: string = "all", timeFilter?: string): string {
   // Build location filter
@@ -1524,7 +1829,7 @@ function extractTags(title: string, description: string): string[] {
 }
 
 
-async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string): Promise<InsertJob[]> {
+export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
   
   const platforms = site === 'all' ? [

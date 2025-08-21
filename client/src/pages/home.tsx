@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { JobSearchForm } from "@/components/job-search-form";
-import { JobCard } from "@/components/job-card";
+import { JobCardEnhanced } from "@/components/job-card-enhanced";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { searchJobs, type SearchResponse } from "@/lib/job-api";
 import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase, User, LogOut } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { FeatureRequest } from "@/components/feature-request";
 import { useAuth } from "@/hooks/useAuth";
 import type { Job, SearchRequest } from "@shared/schema";
 
@@ -91,6 +92,15 @@ export default function Home() {
                       <User className="w-4 h-4" />
                       <span className="hidden md:inline">{user.user_metadata?.first_name || user.email}</span>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/dashboard'}
+                      className="flex items-center space-x-1"
+                    >
+                      <Briefcase className="w-4 h-4" />
+                      <span className="hidden md:inline">Dashboard</span>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -205,7 +215,7 @@ export default function Home() {
           {jobs.length > 0 && (
             <div className="space-y-4" data-testid="job-results">
               {jobs.map((job) => (
-                <JobCard key={job.url} job={job} />
+                <JobCardEnhanced key={job.url} job={job} />
               ))}
             </div>
           )}
@@ -331,6 +341,13 @@ export default function Home() {
                 </li>
                 <li>
                   <a href="/terms" className="hover:text-foreground transition-colors">Terms of Service</a>
+                </li>
+                <li>
+                  <FeatureRequest>
+                    <button className="hover:text-foreground transition-colors text-left">
+                      Feature Requests
+                    </button>
+                  </FeatureRequest>
                 </li>
               </ul>
             </div>

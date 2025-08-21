@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { recommendationScheduler } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -75,6 +76,12 @@ app.use((req, res, next) => {
       
       serverInstance.on('listening', () => {
         log(`serving on port ${port}`);
+        
+        // Start the job recommendation scheduler
+        if (process.env.NODE_ENV !== 'test') {
+          recommendationScheduler.start();
+          log('📅 Job recommendation scheduler started');
+        }
       });
       
       serverInstance.on('error', (err: any) => {
@@ -90,6 +97,7 @@ app.use((req, res, next) => {
       // Graceful shutdown
       process.on('SIGTERM', () => {
         log('SIGTERM received, shutting down gracefully...');
+        recommendationScheduler.stop();
         serverInstance.close(() => {
           process.exit(0);
         });
@@ -97,6 +105,7 @@ app.use((req, res, next) => {
       
       process.on('SIGINT', () => {
         log('SIGINT received, shutting down gracefully...');
+        recommendationScheduler.stop();
         serverInstance.close(() => {
           process.exit(0);
         });
