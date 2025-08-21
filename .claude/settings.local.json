@@ -28,7 +28,8 @@
       "Bash(timeout 20 npm run dev)",
       "Bash(npx tsc:*)",
       "Bash(kill:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(unset:*)"
     ],
     "deny": [],
     "ask": []
