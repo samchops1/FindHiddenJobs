@@ -131,6 +131,7 @@ export default function Dashboard() {
   const applications = applicationsData?.applications || [];
   const recommendedJobs = recommendationsData?.recommendations || [];
   const recommendationsMessage = recommendationsData?.message;
+  const isFirstTimeUser = recommendationsData?.isFirstTime || false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -238,9 +239,14 @@ export default function Dashboard() {
                   <Card>
                     <CardContent className="p-12 text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-                      <h3 className="text-xl font-semibold mb-2">Loading Recommendations</h3>
+                      <h3 className="text-xl font-semibold mb-2">
+                        {isFirstTimeUser ? 'Checking Your Profile...' : 'Loading Your Recommendations...'}
+                      </h3>
                       <p className="text-muted-foreground">
-                        Generating personalized job recommendations for you...
+                        {isFirstTimeUser 
+                          ? 'Analyzing your profile to generate personalized recommendations...'
+                          : 'Loading your personalized job recommendations...'
+                        }
                       </p>
                     </CardContent>
                   </Card>
@@ -248,12 +254,17 @@ export default function Dashboard() {
                   <Card>
                     <CardContent className="p-12 text-center">
                       <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                      <h3 className="text-xl font-semibold mb-2">No Recommendations Yet</h3>
+                      <h3 className="text-xl font-semibold mb-2">
+                        {isFirstTimeUser ? 'Complete Your Profile' : 'Recommendations Coming Soon'}
+                      </h3>
                       <p className="text-muted-foreground mb-4">
-                        {recommendationsMessage || 'Set job preferences, upload a resume, or apply to jobs to get personalized recommendations.'}
+                        {isFirstTimeUser 
+                          ? (recommendationsMessage || 'Complete your profile to get personalized recommendations! Upload a resume, set job preferences, or start applying to jobs.')
+                          : (recommendationsMessage || 'Your personalized recommendations will be populated daily at 9 PM EST. Check back after 9 PM for your curated job matches!')
+                        }
                       </p>
                       <Button onClick={() => window.location.href = '/'}>
-                        Start Job Search
+                        {isFirstTimeUser ? 'Start Job Search' : 'Browse Jobs'}
                       </Button>
                     </CardContent>
                   </Card>
