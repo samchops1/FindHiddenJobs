@@ -226,6 +226,37 @@ Disallow: /*.css$`);
     }
   });
 
+  // Get user's PDF resume file (user can only access their own)
+  app.get('/api/user/resume/download', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      // Security: Only get resume analysis for this specific user
+      const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
+      
+      if (!resumeAnalysis) {
+        return res.status(404).json({ error: 'No resume found for this user' });
+      }
+
+      // Security: Verify the file URL contains the user's folder
+      const fileUrl = resumeAnalysis.fileUrl;
+      if (fileUrl && fileUrl.includes('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464') && fileUrl.includes(`/${userId}/`)) {
+        console.log(`✅ Serving resume file for user ${userId}: ${resumeAnalysis.fileName}`);
+        res.redirect(fileUrl);
+      } else {
+        console.warn(`❌ Security: Invalid file access attempt by user ${userId} for URL: ${fileUrl}`);
+        res.status(403).json({ error: 'Access denied: You can only download your own resume' });
+      }
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      res.status(500).json({ error: 'Failed to download resume' });
+    }
+  });
+
   // Get user's existing resume analysis
   app.get('/api/user/resume/analysis', async (req, res) => {
     try {
@@ -579,23 +610,62 @@ Disallow: /*.css$`);
         console.log(`ℹ️ Error updating user preferences:`, prefError);
       }
 
-      // Now save the resume analysis
+      // Upload PDF to Supabase storage bucket first
+      let publicUrl = filePath; // Fallback to local path
+      
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+        const fileBuffer = fs.readFileSync(filePath);
+        const fileExtension = path.extname(fileName);
+        const uniqueFileName = `${userId}/${Date.now()}_${fileName}`;
+        
+        console.log(`📤 Uploading PDF to bucket: replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464/${uniqueFileName}`);
+        
+        const { data, error } = await supabase.storage
+          .from('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464')
+          .upload(uniqueFileName, fileBuffer, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (error) {
+          console.error('❌ Storage upload error:', error);
+        } else {
+          console.log('✅ PDF uploaded successfully:', data);
+          
+          // Get the public URL for the uploaded file
+          const { data: urlData } = supabase.storage
+            .from('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464')
+            .getPublicUrl(uniqueFileName);
+            
+          publicUrl = urlData.publicUrl;
+          console.log(`🔗 PDF public URL: ${publicUrl}`);
+        }
+      } catch (storageError) {
+        console.error('❌ Failed to upload to storage:', storageError);
+      }
+
+      // Now save the resume analysis with the storage URL
       try {
         await storage.saveResumeAnalysis({
           userId,
           fileName,
-          fileUrl: filePath,
+          fileUrl: publicUrl,
           analysis
         });
-        console.log(`✅ Resume analysis saved for user ${userId}`);
+        console.log(`✅ Resume analysis saved for user ${userId} with file URL: ${publicUrl}`);
       } catch (resumeError) {
         console.error(`❌ Failed to save resume analysis:`, resumeError);
         // Continue anyway - analysis still worked
       }
 
-      // Clean up uploaded file after analysis
+      // Clean up uploaded file after analysis and storage
       try {
         fs.unlinkSync(filePath);
+        console.log(`🧹 Cleaned up temporary file: ${filePath}`);
       } catch (cleanupError) {
         console.error('Failed to clean up uploaded file:', cleanupError);
       }

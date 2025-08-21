@@ -112,6 +112,7 @@ export interface IStorage {
   getUserResumeAnalysis(userId: string): Promise<{
     id: string;
     fileName: string;
+    fileUrl: string;
     analysis: any;
     analyzedAt: Date;
   } | undefined>;
@@ -366,6 +367,7 @@ export class MemStorage implements IStorage {
   async getUserResumeAnalysis(userId: string): Promise<{
     id: string;
     fileName: string;
+    fileUrl: string;
     analysis: any;
     analyzedAt: Date;
   } | undefined> {
@@ -381,6 +383,7 @@ export class MemStorage implements IStorage {
     return {
       id: latest.id,
       fileName: latest.fileName,
+      fileUrl: latest.fileUrl,
       analysis: latest.analysis,
       analyzedAt: latest.analyzedAt
     };

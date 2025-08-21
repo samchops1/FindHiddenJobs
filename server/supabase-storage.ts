@@ -539,6 +539,7 @@ export class SupabaseStorage implements IStorage {
     return {
       id: data.id,
       fileName: data.file_name,
+      fileUrl: data.file_url,
       analysis: data.analysis,
       analyzedAt: new Date(data.analyzed_at)
     };
