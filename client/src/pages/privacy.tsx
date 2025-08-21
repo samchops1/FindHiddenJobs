@@ -224,7 +224,7 @@ export default function Privacy() {
               <li>• <strong>Portability:</strong> Request a copy of your data in a portable format</li>
             </ul>
             <p className="text-sm text-muted-foreground mt-4">
-              To exercise these rights, please contact us through our GitHub repository or available contact methods.
+              To exercise these rights, please contact us at sameer.s.chopra@gmail.com
             </p>
           </div>
         </section>
@@ -268,7 +268,7 @@ export default function Privacy() {
               about this policy or how we handle data, please don't hesitate to reach out.
             </p>
             <div className="text-muted-foreground">
-              <p>Contact us through our GitHub repository or available contact methods.</p>
+              <p>Contact us at <a href="mailto:sameer.s.chopra@gmail.com" className="text-primary hover:underline">sameer.s.chopra@gmail.com</a></p>
             </div>
           </div>
         </section>

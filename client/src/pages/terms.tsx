@@ -304,7 +304,7 @@ export default function Terms() {
               If you have any questions about these Terms of Service, please don't hesitate to reach out to us.
             </p>
             <div className="text-muted-foreground">
-              <p>Contact us through our GitHub repository or available contact methods.</p>
+              <p>Contact us at <a href="mailto:sameer.s.chopra@gmail.com" className="text-primary hover:underline">sameer.s.chopra@gmail.com</a></p>
             </div>
           </div>
         </section>

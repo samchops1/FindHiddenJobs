@@ -158,7 +158,7 @@ export default function About() {
               We're always working to improve our service and would love to hear from you.
             </p>
             <div className="text-muted-foreground">
-              <p>For inquiries, please reach out through our GitHub repository or contact us directly.</p>
+              <p>For inquiries, please contact us at <a href="mailto:sameer.s.chopra@gmail.com" className="text-primary hover:underline">sameer.s.chopra@gmail.com</a></p>
             </div>
           </div>
         </section>
