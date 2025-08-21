@@ -25,9 +25,24 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
   });
 
   const handleSubmit = async (data: SearchRequest) => {
+    // Validate that we have a query
+    const trimmedQuery = data.query?.trim();
+    if (!trimmedQuery) {
+      return;
+    }
+    
+    // Ensure we have all required fields with proper defaults
+    const searchData: SearchRequest = {
+      query: trimmedQuery,
+      site: data.site || "all",
+      timeFilter: data.timeFilter || "all",
+      page: 1,
+      limit: 25
+    };
+    
     setIsSubmitting(true);
     try {
-      onSearch(data);
+      onSearch(searchData);
     } finally {
       setIsSubmitting(false);
     }
@@ -44,7 +59,17 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
 
   const handleQuickSearch = (term: string) => {
     form.setValue("query", term);
-    handleSubmit({ ...form.getValues(), query: term });
+    
+    // Use the same data structure as manual search
+    const searchData: SearchRequest = {
+      query: term.trim(),
+      site: form.getValues("site") || "all",
+      timeFilter: form.getValues("timeFilter") || "all",
+      page: 1,
+      limit: 25
+    };
+    
+    handleSubmit(searchData);
   };
 
   return (
@@ -213,8 +238,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
             <div className="md:col-span-2 lg:col-span-1 flex items-end">
               <Button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 px-4 text-sm rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                disabled={isSubmitting || !form.watch("query")?.trim()}
+                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 px-4 text-sm rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="button-search"
               >
                 <Search className="w-5 h-5 mr-2" />

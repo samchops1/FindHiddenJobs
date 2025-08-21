@@ -28,23 +28,22 @@ export default function Home() {
   const [streamingError, setStreamingError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Regular search (fallback)
-  const {
-    data: searchResponse,
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ["/api/search", searchParams, currentPage],
-    queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
-    enabled: !!searchParams && !isStreamingSearch && streamingJobs.length === 0,
-    staleTime: 60 * 60 * 1000, // 1 hour - matches backend cache
-    gcTime: 90 * 60 * 1000, // 1.5 hours - keep cached pages longer
-  });
-
-  // Always show streaming jobs if available, otherwise fallback to regular search results
-  const jobs = streamingJobs.length > 0 ? streamingJobs : (searchResponse?.jobs || []);
-  const pagination = searchResponse?.pagination;
+  // Always use streaming jobs - no fallback to regular search
+  const jobs = streamingJobs;
+  
+  // Mock isLoading and error for JSX compatibility
+  const isLoading = isStreamingSearch && streamingJobs.length === 0;
+  const error = streamingError;
+  
+  // Mock pagination for JSX compatibility (streaming doesn't use pagination)
+  const pagination = {
+    currentPage: 1,
+    totalPages: 1, 
+    totalJobs: streamingJobs.length,
+    jobsPerPage: streamingJobs.length,
+    hasNextPage: false,
+    hasPrevPage: false
+  };
 
   const handleSearch = (params: SearchRequest) => {
     // Remove location parameter
@@ -115,21 +114,29 @@ export default function Home() {
           console.error('Streaming error:', event.data);
           setStreamingError(event.data.error);
           setIsStreamingSearch(false);
-          setStreamingError(`Search interrupted. Showing ${streamingJobs.length} results found so far.`);
+          // Retry streaming search instead of falling back
+          setStreamingError(`Connection issue. Retrying search...`);
           setTimeout(() => {
             setStreamingError(null);
-          }, 3000);
+            // Retry the same search with streaming
+            if (searchParams) {
+              handleSearch(searchParams);
+            }
+          }, 2000);
           break;
       }
     }).catch((error) => {
       console.error('Streaming connection error:', error);
-      // Keep the results we've collected so far
+      // Retry streaming search instead of giving up
       setIsStreamingSearch(false);
-      setStreamingError(`Connection interrupted. Showing ${streamingJobs.length} results found so far.`);
-      // Clear error after showing it briefly
+      setStreamingError(`Connection issue. Retrying search...`);
       setTimeout(() => {
         setStreamingError(null);
-      }, 3000);
+        // Retry the same search with streaming
+        if (searchParams) {
+          handleSearch(searchParams);
+        }
+      }, 2000);
     });
   };
 
@@ -140,7 +147,8 @@ export default function Home() {
 
   const handleRetry = () => {
     if (searchParams) {
-      refetch();
+      // Always retry with streaming
+      handleSearch(searchParams);
     }
   };
 

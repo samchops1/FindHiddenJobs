@@ -31,7 +31,7 @@ export async function cleanupOldJobs(): Promise<void> {
 }
 
 export interface StreamingSearchEvent {
-  type: 'start' | 'progress' | 'jobs' | 'platform-complete' | 'complete' | 'error';
+  type: 'start' | 'progress' | 'jobs' | 'platform-complete' | 'platform-error' | 'complete' | 'error';
   data: any;
 }
 
@@ -81,7 +81,8 @@ export function searchJobsStreaming(
 
     eventSource.addEventListener('error', (event) => {
       try {
-        const data = event.data ? JSON.parse(event.data) : { error: 'Unknown error' };
+        const messageEvent = event as MessageEvent;
+        const data = messageEvent.data ? JSON.parse(messageEvent.data) : { error: 'Unknown error' };
         onEvent({ type: 'error', data });
         eventSource.close();
         reject(new Error(data.error || 'Search failed'));
