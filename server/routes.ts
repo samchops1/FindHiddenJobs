@@ -41,6 +41,75 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Test endpoint for manual recommendation generation
+  app.post('/api/test/recommendations', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+      
+      console.log(`🧪 Manual recommendation test for: ${email}`);
+      
+      // Import the recommendation engine
+      const { recommendationEngine } = await import('./recommendation-algorithm');
+      
+      // For testing, we'll use a test user ID
+      const testUserId = email === 'sameer.s.chopra@gmail.com' ? 'test-sameer-id' : 'test-user-id';
+      
+      // Clear any existing cache for fresh results
+      recommendationEngine.clearCache(testUserId);
+      
+      // Generate recommendations
+      const recommendations = await recommendationEngine.generateRecommendations(testUserId, 10);
+      
+      console.log(`✅ Generated ${recommendations.length} test recommendations`);
+      
+      // Log the recommendations to console for testing
+      console.log('Test Recommendations:', JSON.stringify(recommendations, null, 2));
+      
+      // Send test email if Resend is configured
+      const { resendEmailService } = await import('./resend-service');
+      
+      if (process.env.RESEND_API_KEY) {
+        await resendEmailService.sendDailyRecommendations(
+          email,
+          'Sameer',
+          recommendations.map(rec => ({
+            title: rec.title,
+            company: rec.company,
+            location: rec.location,
+            url: rec.url,
+            platform: rec.platform,
+            tags: rec.tags || [],
+            logo: rec.logo
+          })),
+          ['Software Engineer', 'Full Stack Developer']
+        );
+        
+        return res.json({ 
+          success: true, 
+          message: `Email sent to ${email}`,
+          recommendationsCount: recommendations.length 
+        });
+      } else {
+        console.log('📧 Test email preview for:', email);
+        console.log('Recommendations:', recommendations);
+        
+        return res.json({ 
+          success: true, 
+          message: 'Recommendations generated (email not sent - Resend not configured)',
+          recommendations: recommendations.slice(0, 3), // Return first 3 for preview
+          totalCount: recommendations.length
+        });
+      }
+    } catch (error) {
+      console.error('Test recommendation error:', error);
+      return res.status(500).json({ error: 'Failed to generate test recommendations' });
+    }
+  });
+
   // SEO sitemap endpoint
   app.get('/sitemap.xml', (req, res) => {
     res.setHeader('Content-Type', 'application/xml');
@@ -2257,7 +2326,7 @@ export async function scrapeJobsFromAllPlatformsStreaming(
         message: `Searching ${platform}...`
       });
       
-      const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+      const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
       allJobs.push(...jobs);
       
       processedPlatforms++;
@@ -2289,7 +2358,7 @@ export async function scrapeJobsFromAllPlatformsStreaming(
   return allJobs;
 }
 
-export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string, isEmailRecommendation?: boolean): Promise<InsertJob[]> {
+export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string, isEmailRecommendation?: boolean, maxResultsPerPlatform?: number): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
   
   const platforms = site === 'all' ? [
@@ -2359,7 +2428,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
       for (const platform of platforms) {
         try {
           console.log(`🔍 Starting sequential search on: ${platform}`);
-          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
           console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
           allJobs.push(...jobs);
           
@@ -2381,7 +2450,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
         
         try {
           console.log(`🔍 Starting parallel search on: ${platform}`);
-          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
           console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
           return jobs;
         } catch (error) {
@@ -2408,7 +2477,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
     // Single platform search - use existing sequential approach
     console.log(`🔍 Running single platform search on: ${site}`);
     try {
-      const jobs = await scrapeJobsFromPlatform(query, site, location, timeFilter);
+      const jobs = await scrapeJobsFromPlatform(query, site, location, timeFilter, maxResultsPerPlatform);
       console.log(`✅ Found ${jobs.length} jobs from ${site}`);
       allJobs.push(...jobs);
     } catch (error) {
@@ -2427,7 +2496,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
   return uniqueJobs;
 }
 
-async function scrapeJobsFromPlatform(query: string, site: string, location: string, timeFilter?: string): Promise<InsertJob[]> {
+async function scrapeJobsFromPlatform(query: string, site: string, location: string, timeFilter?: string, maxResults?: number): Promise<InsertJob[]> {
   try {
     console.log(`\n🔍 Scraping platform: ${site} for query: "${query}"`);
     
@@ -2438,8 +2507,10 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     // Fetch multiple pages of results to get more jobs
     const allResults: (InsertJob | string)[] = [];
     
-    // Get up to 5 pages (50 results max from Google API)
-    for (let page = 1; page <= 5; page++) {
+    // Get up to 5 pages (50 results max from Google API) or until we hit maxResults
+    const maxPages = maxResults ? Math.min(Math.ceil(maxResults / 10), 5) : 5;
+    
+    for (let page = 1; page <= maxPages; page++) {
       const startIndex = (page - 1) * 10 + 1;
       const pageResults = await searchWithGoogleAPI(searchQuery, startIndex, timeFilter);
       
@@ -2450,8 +2521,14 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       
       allResults.push(...pageResults);
       
+      // Check if we've hit the maxResults limit
+      if (maxResults && allResults.length >= maxResults) {
+        console.log(`Reached max results limit of ${maxResults}`);
+        break;
+      }
+      
       // Add delay between API calls to respect rate limits (shorter delay within same platform)
-      if (page < 5) {
+      if (page < maxPages) {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
@@ -2493,8 +2570,11 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       }
     }
 
-    console.log(`Successfully scraped ${jobs.length} jobs from ${site}`);
-    return jobs;
+    // Apply maxResults limit if specified
+    const finalJobs = maxResults && jobs.length > maxResults ? jobs.slice(0, maxResults) : jobs;
+    
+    console.log(`Successfully scraped ${finalJobs.length} jobs from ${site}${maxResults ? ` (limited to ${maxResults})` : ''}`);
+    return finalJobs;
   } catch (error) {
     console.error(`Scraping failed for ${site}:`, error);
     return [];

@@ -24,13 +24,14 @@ export class ResendEmailService {
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
-    this.defaultFrom = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+    this.defaultFrom = process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com';
 
     if (apiKey) {
       this.resend = new Resend(apiKey);
-      console.log('📧 Resend email service initialized');
+      console.log('📧 Resend email service initialized with domain: findhiddenjobs.com');
     } else {
       console.warn('⚠️ RESEND_API_KEY not configured. Emails will be logged to console only.');
+      console.warn('⚠️ Note: Production emails require proper domain setup in Resend dashboard');
     }
   }
 

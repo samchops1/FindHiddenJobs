@@ -24,6 +24,10 @@ export interface JobRecommendation {
   reasons: string[]; // Why this job was recommended
 }
 
+// Cache for recommendations - store for 24 hours
+const recommendationCache = new Map<string, { recommendations: JobRecommendation[], timestamp: number }>();
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
 export class JobRecommendationEngine {
   /**
    * Generate personalized job recommendations for a user
@@ -34,6 +38,13 @@ export class JobRecommendationEngine {
   ): Promise<JobRecommendation[]> {
     try {
       console.log(`🎯 Generating recommendations for user ${userId}`);
+      
+      // Check if we have cached recommendations from the last 24 hours
+      const cachedRecommendations = await this.getCachedRecommendations(userId);
+      if (cachedRecommendations && cachedRecommendations.length > 0) {
+        console.log(`📦 Using cached recommendations for user ${userId}`);
+        return cachedRecommendations.slice(0, limit);
+      }
       
       // Get user profile
       const userProfile = await this.buildUserProfile(userId);
@@ -53,10 +64,13 @@ export class JobRecommendationEngine {
       // Return top recommendations
       const recommendations = filteredJobs
         .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
+        .slice(0, 50); // Cache more than needed
+        
+      // Cache the recommendations for 24 hours
+      await this.cacheRecommendations(userId, recommendations);
         
       console.log(`✅ Generated ${recommendations.length} recommendations`);
-      return recommendations;
+      return recommendations.slice(0, limit);
       
     } catch (error) {
       console.error('❌ Error generating recommendations:', error);
@@ -99,25 +113,53 @@ export class JobRecommendationEngine {
    */
   private async getCandidateJobs(userProfile: UserProfile): Promise<any[]> {
     const allJobs: any[] = [];
+    const seenUrls = new Set<string>();
     
-    // Use job types from preferences, or fallback to suggested job titles from resume, or default types
-    let jobTypesToSearch;
-    if (userProfile.jobTypes.length > 0) {
-      jobTypesToSearch = userProfile.jobTypes.slice(0, 3);
-    } else {
-      // Get resume analysis to check for suggested job titles
-      const resumeAnalysis = await storage.getUserResumeAnalysis(userProfile.userId);
-      if (resumeAnalysis && resumeAnalysis.analysis?.suggestedJobTitles?.length > 0) {
-        jobTypesToSearch = resumeAnalysis.analysis.suggestedJobTitles.slice(0, 3);
-        console.log(`📄 Using job titles from resume analysis: ${jobTypesToSearch.join(', ')}`);
-      } else {
-        jobTypesToSearch = ['software engineer', 'developer']; // Final fallback for new users
-      }
+    // Determine job titles to search - prioritize based on:
+    // 1. Applied job titles (what they've shown interest in)
+    // 2. Resume suggested titles
+    // 3. User preferences
+    // 4. Default fallback
+    let jobTypesToSearch: string[] = [];
+    
+    // Get unique job titles from applications (top priority)
+    if (userProfile.appliedJobTitles.length > 0) {
+      const uniqueAppliedTitles = [...new Set(userProfile.appliedJobTitles)]
+        .slice(0, 2)
+        .map(title => title.toLowerCase());
+      jobTypesToSearch.push(...uniqueAppliedTitles);
+      console.log(`📝 Using applied job titles: ${uniqueAppliedTitles.join(', ')}`);
     }
     
-    console.log(`🔍 Searching for job types: ${jobTypesToSearch.join(', ')}`);
+    // Add resume suggested titles
+    const resumeAnalysis = await storage.getUserResumeAnalysis(userProfile.userId);
+    if (resumeAnalysis && resumeAnalysis.analysis?.suggestedJobTitles?.length > 0) {
+      const resumeTitles = resumeAnalysis.analysis.suggestedJobTitles
+        .slice(0, 3)
+        .filter(title => !jobTypesToSearch.includes(title.toLowerCase()));
+      jobTypesToSearch.push(...resumeTitles);
+      console.log(`📄 Adding resume suggested titles: ${resumeTitles.join(', ')}`);
+    }
     
-    // Search for jobs based on user's preferred job types
+    // Add user preferences if we still need more
+    if (userProfile.jobTypes.length > 0 && jobTypesToSearch.length < 5) {
+      const prefTitles = userProfile.jobTypes
+        .slice(0, 2)
+        .filter(title => !jobTypesToSearch.includes(title.toLowerCase()));
+      jobTypesToSearch.push(...prefTitles);
+    }
+    
+    // Ensure we have at least some titles to search
+    if (jobTypesToSearch.length === 0) {
+      jobTypesToSearch = ['software engineer', 'developer'];
+    }
+    
+    // Limit to 5 job titles maximum for scalability
+    jobTypesToSearch = jobTypesToSearch.slice(0, 5);
+    
+    console.log(`🔍 Searching for ${jobTypesToSearch.length} job titles: ${jobTypesToSearch.join(', ')}`);
+    
+    // Search for jobs - limit to 5 results per title for each platform
     for (const jobType of jobTypesToSearch) {
       try {
         const jobs = await scrapeJobsFromAllPlatforms(
@@ -125,11 +167,24 @@ export class JobRecommendationEngine {
           'all', // Search all platforms
           userProfile.preferredLocation?.toLowerCase() || 'all',
           undefined, // No time filter
-          true // Email recommendation mode - use 1s rate limiting
+          true, // Email recommendation mode - use rate limiting
+          5 // Limit to 5 results per platform
         );
         
-        allJobs.push(...jobs.slice(0, 5)); // Take top 5 from each search (faster)
-        console.log(`🔍 Found ${jobs.length} jobs for "${jobType}"`);
+        // Deduplicate and add jobs
+        for (const job of jobs) {
+          if (!seenUrls.has(job.url)) {
+            seenUrls.add(job.url);
+            allJobs.push(job);
+          }
+        }
+        
+        console.log(`✅ Found ${jobs.length} unique jobs for "${jobType}"`);
+        
+        // Add delay between searches to respect rate limits
+        if (jobTypesToSearch.indexOf(jobType) < jobTypesToSearch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       } catch (error) {
         console.error(`Failed to search for ${jobType}:`, error);
       }
@@ -273,6 +328,42 @@ export class JobRecommendationEngine {
         reasons
       };
     });
+  }
+
+  /**
+   * Get cached recommendations for a user
+   */
+  private async getCachedRecommendations(userId: string): Promise<JobRecommendation[] | null> {
+    const cached = recommendationCache.get(userId);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+      console.log(`📦 Found valid cached recommendations for user ${userId}`);
+      return cached.recommendations;
+    }
+    return null;
+  }
+
+  /**
+   * Cache recommendations for a user
+   */
+  private async cacheRecommendations(userId: string, recommendations: JobRecommendation[]): Promise<void> {
+    recommendationCache.set(userId, {
+      recommendations,
+      timestamp: Date.now()
+    });
+    console.log(`💾 Cached ${recommendations.length} recommendations for user ${userId}`);
+  }
+
+  /**
+   * Clear cache for a specific user or all users
+   */
+  public clearCache(userId?: string): void {
+    if (userId) {
+      recommendationCache.delete(userId);
+      console.log(`🗑️ Cleared cache for user ${userId}`);
+    } else {
+      recommendationCache.clear();
+      console.log(`🗑️ Cleared all recommendation caches`);
+    }
   }
 
   /**
