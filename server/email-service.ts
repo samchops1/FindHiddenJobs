@@ -1,88 +1,35 @@
-import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
 import { storage } from './storage';
 
-// Email service configuration
-const createTransporter = () => {
-  // Check for email service configuration
-  const emailService = process.env.EMAIL_SERVICE || 'console'; // console, gmail, sendgrid, mailgun
-  
-  switch (emailService) {
-    case 'gmail':
-      return nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD,
-        },
-      });
-      
-    case 'sendgrid':
-      return nodemailer.createTransport({
-        host: 'smtp.sendgrid.net',
-        port: 587,
-        secure: false,
-        auth: {
-          user: 'apikey',
-          pass: process.env.SENDGRID_API_KEY,
-        },
-      });
-      
-    case 'mailgun':
-      return nodemailer.createTransport({
-        host: 'smtp.mailgun.org',
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.MAILGUN_USERNAME,
-          pass: process.env.MAILGUN_PASSWORD,
-        },
-      });
-      
-    case 'smtp':
-      return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD,
-        },
-      });
-      
-    default:
-      // Console logger for development/testing
-      return {
-        sendMail: async (mailOptions: any) => {
-          console.log('📧 Email would be sent in production:');
-          console.log('To:', mailOptions.to);
-          console.log('Subject:', mailOptions.subject);
-          console.log('HTML length:', mailOptions.html?.length || 0);
-          if (process.env.NODE_ENV === 'development') {
-            console.log('HTML Preview:', mailOptions.html?.substring(0, 200) + '...');
-          }
-          return { messageId: 'console-test-' + Date.now() };
-        }
-      };
-  }
-};
+// Initialize Supabase client for email functions
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
+if (!supabase) {
+  console.warn('⚠️ Supabase not configured. Emails will be logged to console only.');
+}
+
+// Job recommendation interface
 interface JobRecommendation {
   title: string;
   company: string;
   location: string;
   url: string;
   platform: string;
-  tags: string[];
+  tags?: string[];
   logo?: string;
 }
 
 export class EmailService {
-  private transporter: any;
-  private emailService: string;
-
   constructor() {
-    this.emailService = process.env.EMAIL_SERVICE || 'console';
-    this.transporter = this.emailService === 'supabase' ? null : createTransporter();
+    if (supabase) {
+      console.log('📧 Email service initialized with Supabase');
+    } else {
+      console.log('📧 Email service in console mode (Supabase not configured)');
+    }
   }
 
   async sendDailyRecommendations(
@@ -100,29 +47,9 @@ export class EmailService {
         user?.jobTypes || []
       );
 
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
-        to: userEmail,
-        subject: `🎯 Your Daily Job Recommendations - ${new Date().toLocaleDateString()}`,
-        html: emailContent,
-        text: this.generatePlainTextEmail(recommendations),
-      };
+      const subject = `🎯 Your Daily Job Recommendations - ${new Date().toLocaleDateString()}`;
 
-      if (this.emailService === 'supabase') {
-        await this.sendEmailWithSupabase(
-          mailOptions.to,
-          mailOptions.subject,
-          mailOptions.html
-        );
-      } else if (this.transporter) {
-        await this.transporter.sendMail(mailOptions);
-      } else {
-        // Console mode
-        console.log('📧 Email would be sent in production:');
-        console.log(`To: ${mailOptions.to}`);
-        console.log(`Subject: ${mailOptions.subject}`);
-        console.log(`HTML length: ${mailOptions.html.length}`);
-      }
+      await this.sendEmail(userEmail, subject, emailContent);
       
       // Log the email in storage for tracking
       await this.logEmailSent(userId, 'daily_recommendations', recommendations.map(r => r.url));
@@ -131,6 +58,61 @@ export class EmailService {
     } catch (error) {
       console.error(`❌ Failed to send daily recommendations to ${userEmail}:`, error);
       throw error;
+    }
+  }
+
+  async sendWelcomeEmail(userEmail: string, firstName: string): Promise<void> {
+    try {
+      const emailContent = this.generateWelcomeEmail(firstName);
+      const subject = '🎉 Welcome to FindHiddenJobs.com!';
+
+      await this.sendEmail(userEmail, subject, emailContent);
+      console.log(`✅ Welcome email sent to ${userEmail}`);
+    } catch (error) {
+      console.error(`❌ Failed to send welcome email to ${userEmail}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send email using Supabase Edge Functions
+   */
+  private async sendEmail(
+    to: string,
+    subject: string,
+    htmlContent: string
+  ): Promise<void> {
+    if (!supabase) {
+      console.log('📧 Email would be sent via Supabase:');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`HTML length: ${htmlContent.length}`);
+      return;
+    }
+    
+    try {
+      // Call Supabase Edge Function for sending emails
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to,
+          subject,
+          html: htmlContent,
+          from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com'
+        }
+      });
+      
+      if (error) {
+        console.error('❌ Supabase email error:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Email sent via Supabase to ${to}`);
+    } catch (error) {
+      console.error('❌ Failed to send email via Supabase:', error);
+      // Fallback to console mode if Supabase fails
+      console.log('📧 Fallback: Email would be sent:');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
     }
   }
 
@@ -208,110 +190,6 @@ export class EmailService {
     `;
   }
 
-  private generatePlainTextEmail(recommendations: JobRecommendation[]): string {
-    let text = "Your Daily Job Recommendations\n\n";
-    
-    recommendations.forEach((job, index) => {
-      text += `${index + 1}. ${job.title} at ${job.company}\n`;
-      text += `   Location: ${job.location}\n`;
-      text += `   Apply: ${job.url}\n`;
-      text += `   Platform: ${job.platform}\n\n`;
-    });
-    
-    text += "View your dashboard: https://findhiddenjobs.com/dashboard\n";
-    text += "Unsubscribe: [Unsubscribe Link]";
-    
-    return text;
-  }
-
-  private async logEmailSent(
-    userId: string, 
-    emailType: string, 
-    jobUrls: string[]
-  ): Promise<void> {
-    try {
-      await storage.logEmailSent(userId, emailType, jobUrls);
-    } catch (error) {
-      console.error('Failed to log email:', error);
-    }
-  }
-  
-  /**
-   * Send email using Supabase Edge Functions
-   */
-  private async sendEmailWithSupabase(
-    to: string,
-    subject: string,
-    htmlContent: string
-  ): Promise<void> {
-    if (!supabase) {
-      console.log('⚠️ Supabase not configured, falling back to console mode');
-      console.log('📧 Email would be sent via Supabase:');
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`HTML length: ${htmlContent.length}`);
-      return;
-    }
-    
-    try {
-      // Call Supabase Edge Function for sending emails
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: {
-          to,
-          subject,
-          html: htmlContent,
-          from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com'
-        }
-      });
-      
-      if (error) {
-        console.error('❌ Supabase email error:', error);
-        throw error;
-      }
-      
-      console.log(`✅ Email sent via Supabase to ${to}`);
-    } catch (error) {
-      console.error('❌ Failed to send email via Supabase:', error);
-      // Fallback to console mode if Supabase fails
-      console.log('📧 Fallback: Email would be sent via Supabase:');
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-    }
-  }
-
-  async sendWelcomeEmail(userEmail: string, firstName: string): Promise<void> {
-    try {
-      const emailContent = this.generateWelcomeEmail(firstName);
-
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
-        to: userEmail,
-        subject: '🎉 Welcome to FindHiddenJobs.com!',
-        html: emailContent,
-        text: `Welcome to FindHiddenJobs.com! Thanks for signing up, ${firstName}. Start finding your next opportunity at https://findhiddenjobs.com`,
-      };
-
-      if (this.emailService === 'supabase') {
-        await this.sendEmailWithSupabase(
-          mailOptions.to,
-          mailOptions.subject,
-          mailOptions.html
-        );
-      } else if (this.transporter) {
-        await this.transporter.sendMail(mailOptions);
-      } else {
-        // Console mode
-        console.log('📧 Welcome email would be sent in production:');
-        console.log(`To: ${mailOptions.to}`);
-        console.log(`Subject: ${mailOptions.subject}`);
-      }
-      console.log(`✅ Welcome email sent to ${userEmail}`);
-    } catch (error) {
-      console.error(`❌ Failed to send welcome email to ${userEmail}:`, error);
-      throw error;
-    }
-  }
-
   private generateWelcomeEmail(firstName: string): string {
     return `
     <!DOCTYPE html>
@@ -361,6 +239,18 @@ export class EmailService {
     </body>
     </html>
     `;
+  }
+
+  private async logEmailSent(
+    userId: string, 
+    emailType: string, 
+    jobUrls: string[]
+  ): Promise<void> {
+    try {
+      await storage.logEmailSent(userId, emailType, jobUrls);
+    } catch (error) {
+      console.error('Failed to log email:', error);
+    }
   }
 }
 

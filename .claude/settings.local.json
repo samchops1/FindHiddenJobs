@@ -19,7 +19,8 @@
       "Bash(grep:*)",
       "Bash(mkdir:*)",
       "Bash(rm:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []
