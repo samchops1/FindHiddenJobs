@@ -256,7 +256,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-card border-t border-border mt-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="grid md:grid-cols-3 gap-12">
+          <div className="grid md:grid-cols-2 gap-12">
             <div className="md:col-span-1">
               <div className="flex items-center space-x-2 mb-4">
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -271,24 +271,10 @@ export default function Home() {
             
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-6 uppercase tracking-wider">
-                Supported Platforms
-              </h4>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="hover:text-foreground transition-colors cursor-pointer">Greenhouse</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Lever</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Ashby</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Workday</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Workable</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-semibold text-foreground mb-6 uppercase tracking-wider">
                 Resources
               </h4>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="hover:text-foreground transition-colors cursor-pointer">About</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Help Center</li>
                 <li className="hover:text-foreground transition-colors cursor-pointer">Privacy Policy</li>
                 <li className="hover:text-foreground transition-colors cursor-pointer">Terms of Service</li>
               </ul>
