@@ -226,6 +226,48 @@ Disallow: /*.css$`);
     }
   });
 
+  // Serve files from Replit Object Storage
+  app.get('/objects/:fileName', async (req, res) => {
+    try {
+      const fileName = req.params.fileName; // Gets the filename
+      
+      // Basic security: Check if the file path contains user-specific patterns
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Security: Only allow access to files that belong to the requesting user
+      if (!fileName.includes(`${userId}_`)) {
+        console.warn(`❌ Security: User ${userId} attempted to access file: ${fileName}`);
+        return res.status(403).json({ error: 'Access denied: You can only download your own files' });
+      }
+
+      console.log(`📄 Serving file from Replit Object Storage: ${fileName} for user ${userId}`);
+      
+      const { Client } = await import('@replit/object-storage');
+      const client = new Client(process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!);
+      
+      // Download the file from Replit Object Storage
+      const fileData = await client.downloadAsBytes(fileName);
+      
+      // Set appropriate headers for PDF files
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${fileName.split('_').pop()}"`, // Use original filename
+        'Cache-Control': 'private, max-age=3600'
+      });
+      
+      // Send the file data
+      res.send(fileData);
+      
+    } catch (error) {
+      console.error('Error serving file from Replit Object Storage:', error);
+      res.status(404).json({ error: 'File not found' });
+    }
+  });
+
   // Get user's PDF resume file (user can only access their own)
   app.get('/api/user/resume/download', async (req, res) => {
     try {
@@ -242,9 +284,9 @@ Disallow: /*.css$`);
         return res.status(404).json({ error: 'No resume found for this user' });
       }
 
-      // Security: Verify the file URL contains the user's folder
+      // Security: Verify the file URL is for this user
       const fileUrl = resumeAnalysis.fileUrl;
-      if (fileUrl && fileUrl.includes('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464') && fileUrl.includes(`/${userId}/`)) {
+      if (fileUrl && fileUrl.startsWith('/objects/') && fileUrl.includes(`${userId}_`)) {
         console.log(`✅ Serving resume file for user ${userId}: ${resumeAnalysis.fileName}`);
         res.redirect(fileUrl);
       } else {
@@ -610,42 +652,31 @@ Disallow: /*.css$`);
         console.log(`ℹ️ Error updating user preferences:`, prefError);
       }
 
-      // Upload PDF to Supabase storage bucket first
+      // Upload PDF to Replit Object Storage
       let publicUrl = filePath; // Fallback to local path
       
       try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+        const { Client } = await import('@replit/object-storage');
+        const client = new Client(process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!);
+        
         const fileBuffer = fs.readFileSync(filePath);
         const fileExtension = path.extname(fileName);
-        const uniqueFileName = `${userId}/${Date.now()}_${fileName}`;
+        const uniqueFileName = `uploads/${userId}_${Date.now()}_${fileName}`;
         
-        console.log(`📤 Uploading PDF to bucket: replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464/${uniqueFileName}`);
+        console.log(`📤 Uploading PDF to Replit Object Storage: ${uniqueFileName}`);
         
-        const { data, error } = await supabase.storage
-          .from('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464')
-          .upload(uniqueFileName, fileBuffer, {
-            contentType: 'application/pdf',
-            upsert: true
-          });
-
-        if (error) {
-          console.error('❌ Storage upload error:', error);
-        } else {
-          console.log('✅ PDF uploaded successfully:', data);
-          
-          // Get the public URL for the uploaded file
-          const { data: urlData } = supabase.storage
-            .from('replit-objstore-94d990fc-0c7f-481b-b7ab-33d85a14e464')
-            .getPublicUrl(uniqueFileName);
-            
-          publicUrl = urlData.publicUrl;
-          console.log(`🔗 PDF public URL: ${publicUrl}`);
-        }
+        // Upload to Replit Object Storage
+        await client.uploadFromBytes(uniqueFileName, fileBuffer);
+        
+        console.log('✅ PDF uploaded successfully to Replit Object Storage');
+        
+        // Get the object URL - for private objects, we'll serve them through our API
+        publicUrl = `/objects/${uniqueFileName}`;
+        console.log(`🔗 PDF object path: ${publicUrl}`);
+        
       } catch (storageError) {
-        console.error('❌ Failed to upload to storage:', storageError);
+        console.error('❌ Failed to upload to Replit Object Storage:', storageError);
+        console.log('📝 Continuing with local file path as fallback');
       }
 
       // Now save the resume analysis with the storage URL
