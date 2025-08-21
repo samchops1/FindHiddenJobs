@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://findhiddenjobs.com/sitemap.xml
+
+# Crawl-delay for being respectful to search engines
+Crawl-delay: 1
+
+# Block certain paths that aren't useful for SEO
+Disallow: /api/
+Disallow: /src/
+Disallow: /node_modules/
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /*.css$

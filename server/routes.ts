@@ -14,6 +14,41 @@ const jobSearchCache = new Map<string, { jobs: any[]; timestamp: number }>();
 const JOB_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // SEO sitemap endpoint
+  app.get('/sitemap.xml', (req, res) => {
+    res.setHeader('Content-Type', 'application/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://findhiddenjobs.com/</loc>
+    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`);
+  });
+
+  // SEO robots.txt endpoint
+  app.get('/robots.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://findhiddenjobs.com/sitemap.xml
+
+# Crawl-delay for being respectful to search engines
+Crawl-delay: 1
+
+# Block certain paths that aren't useful for SEO
+Disallow: /api/
+Disallow: /src/
+Disallow: /node_modules/
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /*.css$`);
+  });
+
   // Job search endpoint
   app.get('/api/search', async (req, res) => {
     try {

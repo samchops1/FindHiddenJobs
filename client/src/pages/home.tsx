@@ -8,6 +8,7 @@ import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Job, SearchRequest } from "@shared/schema";
+import logoImage from "@assets/Gemini_Generated_Image_cphjl0cphjl0cphj (1)_1755758641265.png";
 
 export default function Home() {
   const [searchParams, setSearchParams] = useState<SearchRequest | null>(null);
@@ -51,15 +52,13 @@ export default function Home() {
       <header className="bg-white border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Search className="w-4 h-4 text-white" />
-                </div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="main-title">
-                  FindHiddenJobs.com
-                </h1>
-              </div>
+            <div className="flex items-center">
+              <img 
+                src={logoImage} 
+                alt="FindHiddenJobs.com" 
+                className="h-12 w-auto" 
+                data-testid="main-logo"
+              />
             </div>
             <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
               <div className="flex items-center space-x-1">
@@ -79,9 +78,9 @@ export default function Home() {
       <div className="bg-gradient-to-br from-primary-50 to-white border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center max-w-3xl mx-auto">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
               Find your next opportunity
-            </h2>
+            </h1>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
               Search across all major job platforms simultaneously. Get real-time results for jobs that aren't listed on LinkedIn or Indeed.
             </p>
@@ -102,9 +101,9 @@ export default function Home() {
           {(searchParams || isLoading) && (
             <div className="flex items-center justify-between bg-card rounded-2xl p-6 border border-border">
               <div>
-                <h2 className="text-2xl font-bold text-foreground" data-testid="results-title">
+                <h3 className="text-2xl font-bold text-foreground" data-testid="results-title">
                   Job Opportunities
-                </h2>
+                </h3>
                 <p className="text-muted-foreground mt-1">
                   {pagination ? `${pagination.totalJobs} results found` : "Find your perfect match"}
                 </p>
