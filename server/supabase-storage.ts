@@ -570,7 +570,7 @@ export class SupabaseStorage implements IStorage {
 
     const { data, error } = await supabase
       .from('email_logs')
-      .select('email_type, created_at')
+      .select('email_type, sent_at')
       .eq('user_id', userId);
 
     if (error) {
@@ -580,7 +580,7 @@ export class SupabaseStorage implements IStorage {
 
     return data?.map(log => ({
       emailType: log.email_type,
-      sentAt: new Date(log.created_at)
+      sentAt: new Date(log.sent_at)
     })) || [];
   }
 
