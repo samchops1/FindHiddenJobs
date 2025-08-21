@@ -308,6 +308,7 @@ Disallow: /*.css$`);
         return res.status(401).json({ error: 'User ID required' });
       }
 
+      console.log(`🔍 Looking for resume analysis for user: ${userId}`);
       const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
       
       if (resumeAnalysis) {

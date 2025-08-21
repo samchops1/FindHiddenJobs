@@ -30,6 +30,7 @@ export function ResumeUpload({ onAnalysisComplete }: ResumeUploadProps) {
     
     setIsLoadingExisting(true);
     try {
+      console.log('Loading resume for user:', user.id, user.email);
       const response = await fetch('/api/user/resume/analysis', {
         headers: {
           'x-user-id': user.id,
@@ -38,10 +39,15 @@ export function ResumeUpload({ onAnalysisComplete }: ResumeUploadProps) {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Resume API response:', data);
         if (data.hasResume) {
           setAnalysisResult(data.analysis);
-          // Create a mock file object to show in the UI
-          const mockFile = new File([''], data.fileName, { type: 'application/pdf' });
+          // Create a mock file object to show in the UI - simplified approach
+          const mockFile = {
+            name: data.fileName || 'resume.pdf',
+            size: 0,
+            type: 'application/pdf'
+          } as File;
           setUploadedFile(mockFile);
           
           if (onAnalysisComplete) {
