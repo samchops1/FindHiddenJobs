@@ -185,7 +185,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors min-w-0"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-location"
                           >
                             <SelectValue />
@@ -220,7 +220,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors min-w-0"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-time-filter"
                           >
                             <SelectValue />
