@@ -116,7 +116,7 @@ Disallow: /*.css$`);
         });
 
         // Use graceful search with rate limit handling
-        allJobs = await scrapeJobsFromAllPlatformsGraceful(query, site, location, normalizedTimeFilter, false);
+        allJobs = await scrapeJobsFromAllPlatformsGraceful(query, site, location || 'all', normalizedTimeFilter, false);
         
         // Store scraped jobs
         for (const jobData of allJobs) {
@@ -212,7 +212,7 @@ Disallow: /*.css$`);
       sendEvent('start', { message: 'Search started', query, site, location });
       
       const jobs = await scrapeJobsFromAllPlatformsStreaming(
-        query, site, location, normalizedTimeFilter, sendEvent
+        query, site, location || 'all', normalizedTimeFilter, sendEvent
       );
       
       sendEvent('complete', { totalJobs: jobs.length });
