@@ -100,10 +100,20 @@ export class JobRecommendationEngine {
   private async getCandidateJobs(userProfile: UserProfile): Promise<any[]> {
     const allJobs: any[] = [];
     
-    // Use job types from preferences, or fallback to default types if none specified
-    let jobTypesToSearch = userProfile.jobTypes.length > 0 
-      ? userProfile.jobTypes.slice(0, 3)
-      : ['software engineer', 'developer']; // Fallback for new users
+    // Use job types from preferences, or fallback to suggested job titles from resume, or default types
+    let jobTypesToSearch;
+    if (userProfile.jobTypes.length > 0) {
+      jobTypesToSearch = userProfile.jobTypes.slice(0, 3);
+    } else {
+      // Get resume analysis to check for suggested job titles
+      const resumeAnalysis = await storage.getUserResumeAnalysis(userProfile.userId);
+      if (resumeAnalysis && resumeAnalysis.analysis?.suggestedJobTitles?.length > 0) {
+        jobTypesToSearch = resumeAnalysis.analysis.suggestedJobTitles.slice(0, 3);
+        console.log(`📄 Using job titles from resume analysis: ${jobTypesToSearch.join(', ')}`);
+      } else {
+        jobTypesToSearch = ['software engineer', 'developer']; // Final fallback for new users
+      }
+    }
     
     console.log(`🔍 Searching for job types: ${jobTypesToSearch.join(', ')}`);
     

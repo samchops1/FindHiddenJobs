@@ -70,64 +70,94 @@ export class ResumeParser {
           const dataBuffer = fs.readFileSync(filePath);
           const pdfParse = (await import('pdf-parse')).default;
           const pdfData = await pdfParse(dataBuffer);
-          return pdfData.text;
+          
+          if (pdfData.text && pdfData.text.length > 50) {
+            console.log(`✅ Successfully extracted ${pdfData.text.length} characters from PDF`);
+            return pdfData.text;
+          } else {
+            throw new Error('PDF text extraction returned insufficient content');
+          }
         } catch (pdfError) {
-          console.warn('PDF parsing failed, using filename and enhanced basic analysis');
-          // Enhanced fallback analysis based on filename and common resume patterns
-          const nameFromFile = fileName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ');
-          return `Professional Resume: ${nameFromFile}
-
-PROFESSIONAL EXPERIENCE:
-Senior Software Engineer at Tech Company (2021-2024)
-- Led development of web applications using React and TypeScript
-- Mentored junior developers and conducted code reviews  
-- Implemented CI/CD pipelines using Docker and Kubernetes
-- Collaborated with cross-functional teams on product features
-
-Software Developer at Previous Company (2019-2021)
-- Developed full-stack web applications using JavaScript and Python
-- Built RESTful APIs and integrated with databases
-- Worked with cloud platforms like AWS and Azure
-- Participated in agile development processes
-
-TECHNICAL SKILLS:
-Frontend: React, Vue.js, TypeScript, JavaScript, HTML5, CSS3, Sass, Bootstrap
-Backend: Node.js, Python, Java, Express.js, Django, Flask, Spring Boot  
-Databases: PostgreSQL, MongoDB, MySQL, Redis, Elasticsearch
-Cloud & DevOps: AWS, Azure, Docker, Kubernetes, Jenkins, Git, GitHub
-Tools: VSCode, IntelliJ, Figma, Jira, Slack, Postman
-
-EDUCATION:
-Bachelor of Science in Computer Science
-University, 2019
-
-This resume demonstrates experience in modern web development technologies and best practices for building scalable applications.`;
+          console.warn('PDF parsing failed, trying alternative methods:', pdfError);
+          
+          // Try to read the file as plain text (some PDFs might have readable text content)
+          try {
+            const buffer = fs.readFileSync(filePath);
+            const text = buffer.toString('utf8');
+            // Look for readable text patterns
+            const cleanedText = text.replace(/[\x00-\x08\x0E-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            if (cleanedText.length > 100) {
+              console.log(`✅ Extracted text from PDF using alternative method: ${cleanedText.length} characters`);
+              return cleanedText;
+            }
+          } catch (altError) {
+            console.warn('Alternative PDF text extraction also failed:', altError);
+          }
+          
+          throw new Error('Could not extract readable text from PDF file');
         }
-      } else if (fileExtension === '.docx' || fileExtension === '.doc') {
-        // For DOC/DOCX files, read as binary and try to extract basic text
-        const buffer = fs.readFileSync(filePath);
-        const text = buffer.toString('utf8');
-        // Clean up binary data and extract readable text
-        return text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ').trim();
+      } else if (fileExtension === '.docx') {
+        try {
+          // Use mammoth for proper DOCX parsing
+          const mammoth = (await import('mammoth')).default;
+          const buffer = fs.readFileSync(filePath);
+          const result = await mammoth.extractRawText({ buffer });
+          
+          if (result.value && result.value.length > 50) {
+            console.log(`✅ Successfully extracted ${result.value.length} characters from DOCX`);
+            return result.value;
+          } else {
+            throw new Error('DOCX text extraction returned insufficient content');
+          }
+        } catch (docxError) {
+          console.warn('DOCX parsing with mammoth failed:', docxError);
+          // Fallback to basic buffer reading
+          try {
+            const buffer = fs.readFileSync(filePath);
+            const text = buffer.toString('utf8');
+            const cleanedText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            if (cleanedText.length > 100) {
+              console.log(`✅ Extracted text from DOCX using fallback method: ${cleanedText.length} characters`);
+              return cleanedText;
+            }
+          } catch (fallbackError) {
+            console.warn('DOCX fallback extraction also failed:', fallbackError);
+          }
+          
+          throw new Error('Could not extract readable text from DOCX file');
+        }
+      } else if (fileExtension === '.doc') {
+        // For older DOC files, try basic text extraction
+        try {
+          const buffer = fs.readFileSync(filePath);
+          const text = buffer.toString('utf8');
+          const cleanedText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ').trim();
+          
+          if (cleanedText.length > 100) {
+            console.log(`✅ Extracted text from DOC file: ${cleanedText.length} characters`);
+            return cleanedText;
+          } else {
+            throw new Error('DOC text extraction returned insufficient content');
+          }
+        } catch (docError) {
+          console.warn('DOC text extraction failed:', docError);
+          throw new Error('Could not extract readable text from DOC file');
+        }
       } else {
         // Try to read as plain text
-        return fs.readFileSync(filePath, 'utf8');
+        const text = fs.readFileSync(filePath, 'utf8');
+        if (text && text.length > 50) {
+          console.log(`✅ Read plain text file: ${text.length} characters`);
+          return text;
+        } else {
+          throw new Error('Plain text file is too short or empty');
+        }
       }
     } catch (error) {
       console.error('Error extracting text from file:', error);
-      // Fallback: create basic content for analysis
-      return `Resume document: ${fileName}
-      
-This is a resume document that contains professional information including:
-- Work experience and employment history
-- Technical skills and capabilities
-- Educational background and qualifications
-- Professional accomplishments and projects
-
-The document appears to be in ${fileExtension.substring(1).toUpperCase()} format and contains career-related information suitable for job application purposes.
-
-Skills commonly found in professional resumes:
-Programming languages, frameworks, databases, cloud platforms, project management, communication, problem-solving, teamwork, leadership.`;
+      throw new Error(`Failed to extract readable text from resume file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
