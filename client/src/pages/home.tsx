@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { JobSearchForm } from "@/components/job-search-form";
 import { JobCardEnhanced } from "@/components/job-card-enhanced";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
-import { searchJobs, type SearchResponse } from "@/lib/job-api";
-import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase, User, LogOut } from "lucide-react";
+import { searchJobs, searchJobsStreaming, type SearchResponse, type StreamingSearchEvent } from "@/lib/job-api";
+import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase, User, LogOut, MessageCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { FeatureRequest } from "@/components/feature-request";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,7 +19,16 @@ export default function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const { user, loading, signOut } = useAuth();
+  
+  // Streaming search state
+  const [streamingJobs, setStreamingJobs] = useState<Job[]>([]);
+  const [isStreamingSearch, setIsStreamingSearch] = useState(false);
+  const [streamingProgress, setStreamingProgress] = useState(0);
+  const [streamingMessage, setStreamingMessage] = useState('');
+  const [streamingError, setStreamingError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
+  // Regular search (fallback)
   const {
     data: searchResponse,
     isLoading,
@@ -27,17 +37,56 @@ export default function Home() {
   } = useQuery({
     queryKey: ["/api/search", searchParams, currentPage],
     queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
-    enabled: !!searchParams,
+    enabled: !!searchParams && !isStreamingSearch,
     staleTime: 10 * 60 * 1000, // 10 minutes - matches backend cache
     gcTime: 15 * 60 * 1000, // 15 minutes - keep cached pages longer
   });
 
-  const jobs = searchResponse?.jobs || [];
+  const jobs = isStreamingSearch ? streamingJobs : (searchResponse?.jobs || []);
   const pagination = searchResponse?.pagination;
 
   const handleSearch = (params: SearchRequest) => {
-    setSearchParams(params);
-    setCurrentPage(1); // Reset to first page for new search
+    // Remove location parameter
+    const { location, ...searchParamsWithoutLocation } = params;
+    
+    setSearchParams(searchParamsWithoutLocation);
+    setCurrentPage(1);
+    
+    // Start streaming search
+    setIsStreamingSearch(true);
+    setStreamingJobs([]);
+    setStreamingProgress(0);
+    setStreamingMessage('Starting search...');
+    setStreamingError(null);
+    
+    searchJobsStreaming(searchParamsWithoutLocation, (event: StreamingSearchEvent) => {
+      switch (event.type) {
+        case 'start':
+          setStreamingMessage(`Searching for "${event.data.query}"...`);
+          break;
+        case 'progress':
+          const progress = (event.data.processed / event.data.total) * 100;
+          setStreamingProgress(progress);
+          setStreamingMessage(`Searching ${event.data.platform}...`);
+          break;
+        case 'jobs':
+          setStreamingJobs(prev => [...prev, ...event.data.jobs]);
+          setStreamingMessage(`Found ${event.data.jobsFromPlatform} jobs on ${event.data.platform}`);
+          break;
+        case 'complete':
+          setStreamingProgress(100);
+          setStreamingMessage(`Search complete! Found ${event.data.totalJobs} jobs`);
+          setIsStreamingSearch(false);
+          break;
+        case 'error':
+          setStreamingError(event.data.error);
+          setIsStreamingSearch(false);
+          break;
+      }
+    }).catch((error) => {
+      setStreamingError(error.message);
+      setIsStreamingSearch(false);
+    });
   };
 
   const handlePageChange = (page: number) => {
@@ -79,10 +128,12 @@ export default function Home() {
                   <Building className="w-4 h-4" />
                   <span>Multi-platform</span>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Globe className="w-4 h-4" />
-                  <span>All locations</span>
-                </div>
+                <FeatureRequest>
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-1">
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Feedback</span>
+                  </Button>
+                </FeatureRequest>
               </div>
               
               {!loading && (
@@ -192,7 +243,50 @@ export default function Home() {
           )}
 
           {/* Loading State */}
-          {isLoading && <LoadingSkeleton />}
+          {isLoading && !isStreamingSearch && <LoadingSkeleton />}
+          
+          {/* Streaming Progress */}
+          {isStreamingSearch && (
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Searching Platforms</h3>
+                    <p className="text-sm text-muted-foreground">{streamingMessage}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-foreground">{streamingJobs.length} jobs found</div>
+                    <div className="text-xs text-muted-foreground">{Math.round(streamingProgress)}% complete</div>
+                  </div>
+                </div>
+                <Progress value={streamingProgress} className="w-full" />
+              </div>
+            </div>
+          )}
+
+          {/* Streaming Error State */}
+          {streamingError && (
+            <div className="bg-card rounded-2xl border border-destructive/20 p-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Streaming search failed</h3>
+                  <p className="text-muted-foreground mb-4">{streamingError}</p>
+                  <Button 
+                    onClick={() => searchParams && handleSearch(searchParams)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Retry Search</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error State */}
           {error && (
@@ -366,7 +460,7 @@ export default function Home() {
           <div className="border-t border-border pt-8 mt-12">
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                &copy; 2024 FindHiddenJobs.com. All rights reserved.
+                &copy; 2025 FindHiddenJobs.com. All rights reserved.
               </p>
             </div>
           </div>

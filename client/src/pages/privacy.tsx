@@ -55,7 +55,7 @@ export default function Privacy() {
         {/* Last Updated */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8">
           <p className="text-sm text-blue-800">
-            <strong>Last Updated:</strong> August 21, 2024
+            <strong>Last Updated:</strong> August 21, 2025
           </p>
         </div>
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Briefcase, Building, Search, MapPin, Clock } from "lucide-react";
+import { Briefcase, Building, Search, Clock } from "lucide-react";
 
 interface JobSearchFormProps {
   onSearch: (params: SearchRequest) => void;
@@ -20,7 +20,6 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
     defaultValues: {
       query: "",
       site: "all",
-      location: "all",
       timeFilter: "all",
     },
   });
@@ -56,7 +55,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="md:col-span-2 lg:col-span-2">
               <FormField
                 control={form.control}
@@ -161,41 +160,6 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectItem value="people.*">👥 People Subdomains</SelectItem>
                             <SelectItem value="talent.*">⭐ Talent Subdomains</SelectItem>
                             <SelectItem value="other-pages">📋 Other Job Pages</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="lg:col-span-1">
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-gray-700">
-                      Location
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger 
-                            className="pl-12 py-2.5 text-sm border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
-                            data-testid="select-location"
-                          >
-                            <SelectValue placeholder="🌍 All Locations" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">🌍 All Locations</SelectItem>
-                            <SelectItem value="remote">🏠 Remote Only</SelectItem>
-                            <SelectItem value="onsite">🏢 On-site Only</SelectItem>
-                            <SelectItem value="hybrid">🔄 Hybrid</SelectItem>
-                            <SelectItem value="united-states">🇺🇸 United States</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
