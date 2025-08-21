@@ -268,17 +268,18 @@ export class EmailService {
           
           <h3>What's next?</h3>
           <ul style="padding-left: 20px;">
+            <li>✨ <strong>AI-powered job matching</strong> - Get personalized recommendations based on your skills and experience</li>
             <li>🔍 <strong>Search across multiple platforms</strong> - Find jobs that aren't on LinkedIn or Indeed</li>
             <li>💾 <strong>Save interesting opportunities</strong> - Keep track of jobs you want to apply to</li>
-            <li>📊 <strong>Track your applications</strong> - Monitor your job search progress</li>
-            <li>📧 <strong>Get daily recommendations</strong> - Receive personalized job suggestions at 9 PM EST</li>
+            <li>📊 <strong>Track your applications</strong> - Monitor your job search progress with AI insights</li>
+            <li>📧 <strong>Get daily AI recommendations</strong> - Receive smart job suggestions at 9 PM EST</li>
           </ul>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="https://findhiddenjobs.com" class="cta-button">Start Job Searching</a>
           </div>
           
-          <p style="color: #6b7280; font-size: 14px;">Pro tip: Upload your resume to get even better personalized recommendations!</p>
+          <p style="color: #6b7280; font-size: 14px;">Pro tip: Upload your resume to unlock advanced AI matching based on your specific skills and experience!</p>
         </div>
         
         <div class="footer">
