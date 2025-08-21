@@ -22,6 +22,8 @@ export default function Home() {
     queryKey: ["/api/search", searchParams, currentPage],
     queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
     enabled: !!searchParams,
+    staleTime: 10 * 60 * 1000, // 10 minutes - matches backend cache
+    gcTime: 15 * 60 * 1000, // 15 minutes - keep cached pages longer
   });
 
   const jobs = searchResponse?.jobs || [];
@@ -55,7 +57,7 @@ export default function Home() {
                   <Search className="w-4 h-4 text-white" />
                 </div>
                 <h1 className="text-2xl font-bold text-foreground" data-testid="main-title">
-                  DirectHire
+                  FindHiddenJobs.com
                 </h1>
               </div>
             </div>
@@ -81,7 +83,7 @@ export default function Home() {
               Find your next opportunity
             </h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Search across all major job platforms simultaneously. Get real-time results from the world's top companies.
+              Search across all major job platforms simultaneously. Get real-time results for jobs that aren't listed on LinkedIn or Indeed.
             </p>
           </div>
         </div>
@@ -254,7 +256,7 @@ export default function Home() {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <Search className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-foreground">DirectHire</h3>
+                <h3 className="text-xl font-bold text-foreground">FindHiddenJobs.com</h3>
               </div>
               <p className="text-muted-foreground leading-relaxed max-w-sm">
                 The professional way to search for opportunities across all major job platforms. Find your next career move.
@@ -290,7 +292,7 @@ export default function Home() {
           <div className="border-t border-border pt-8 mt-12">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <p className="text-sm text-muted-foreground">
-                &copy; 2024 DirectHire. All rights reserved.
+                &copy; 2024 FindHiddenJobs.com. All rights reserved.
               </p>
               <div className="flex items-center space-x-3 mt-4 md:mt-0">
                 <span className="text-xs text-muted-foreground">Powered by modern web scraping</span>

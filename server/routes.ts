@@ -9,6 +9,10 @@ import * as cheerio from "cheerio";
 const searchCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
+// In-memory cache for full job search results (for pagination)
+const jobSearchCache = new Map<string, { jobs: any[]; timestamp: number }>();
+const JOB_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Job search endpoint
   app.get('/api/search', async (req, res) => {
@@ -28,18 +32,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ Schema validation passed: query="${query}", site="${site}", location="${location}", timeFilter="${timeFilter || 'none'}"`);
       
-      // Store search history
-      await storage.createSearch({
-        query,
-        platform: site === 'all' ? 'All Platforms' : site,
-        resultCount: "0"
-      });
-
-      const allJobs = await scrapeJobsFromAllPlatforms(query, site, location, timeFilter);
+      // Create cache key for this search (excluding page number)
+      const cacheKey = `${query}:${site}:${location}:${timeFilter || 'all'}`;
+      const cachedResult = jobSearchCache.get(cacheKey);
       
-      // Store scraped jobs
-      for (const jobData of allJobs) {
-        await storage.createJob(jobData);
+      let allJobs;
+      
+      // Check if we have cached results for this search
+      if (cachedResult && (Date.now() - cachedResult.timestamp) < JOB_CACHE_DURATION) {
+        console.log(`🎯 Using cached results for search: ${cacheKey}`);
+        allJobs = cachedResult.jobs;
+      } else {
+        console.log(`🔍 Performing fresh search for: ${cacheKey}`);
+        
+        // Store search history only for fresh searches
+        await storage.createSearch({
+          query,
+          platform: site === 'all' ? 'All Platforms' : site,
+          resultCount: "0"
+        });
+
+        allJobs = await scrapeJobsFromAllPlatforms(query, site, location, timeFilter);
+        
+        // Store scraped jobs
+        for (const jobData of allJobs) {
+          await storage.createJob(jobData);
+        }
+        
+        // Cache the full results
+        jobSearchCache.set(cacheKey, {
+          jobs: allJobs,
+          timestamp: Date.now()
+        });
+        
+        console.log(`💾 Cached ${allJobs.length} jobs for search: ${cacheKey}`);
       }
 
       // Apply pagination
@@ -53,11 +79,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
 
-      // Update search result count
-      const searches = await storage.getRecentSearches();
-      const latestSearch = searches[0];
-      if (latestSearch) {
-        latestSearch.resultCount = totalJobs.toString();
+      // Update search result count (only for fresh searches)
+      if (!cachedResult || (Date.now() - cachedResult.timestamp) >= JOB_CACHE_DURATION) {
+        const searches = await storage.getRecentSearches();
+        const latestSearch = searches[0];
+        if (latestSearch) {
+          latestSearch.resultCount = totalJobs.toString();
+        }
       }
 
       // Prevent caching to ensure fresh results
@@ -1307,13 +1335,55 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
   
   const platforms = site === 'all' ? [
-    'boards.greenhouse.io',
-    'jobs.lever.co', 
-    'jobs.ashbyhq.com',
-    'jobs.workable.com',
+    // Major ATS Platforms
+    'greenhouse.io',
+    'lever.co',
+    'ashbyhq.com',
     'myworkdayjobs.com',
+    'jobs.workable.com',
     'adp',
+    'icims.com',
+    'jobvite.com',
+    
+    // Modern Platforms
+    'remoterocketship.com',
+    'wellfound.com',
+    'workatastartup.com',
+    'builtin.com',
+    'rippling-ats.com',
+    'jobs.gusto.com',
+    'dover.io',
+    
+    // HR Systems
+    'recruiting.paylocity.com',
+    'breezy.hr',
+    'applytojob.com',
+    'jobs.smartrecruiters.com',
+    'trinethire.com',
+    'recruitee.com',
+    'teamtailor.com',
+    'homerun.co',
+    
+    // Specialized
+    'pinpointhq.com',
+    'keka.com',
+    'oraclecloud.com',
+    'careerpuck.com',
+    'jobappnetwork.com',
+    'gem.com',
+    'trakstar.com',
+    'catsone.com',
+    'notion.site',
+    
+    // Job Boards
+    'linkedin.com',
+    'glassdoor.com',
+    
+    // Generic Patterns (these will cover many more sites)
+    'jobs.*',
     'careers.*',
+    'people.*',
+    'talent.*',
     'other-pages'
   ] : [site];
 
@@ -1321,7 +1391,7 @@ async function scrapeJobsFromAllPlatforms(query: string, site: string, location:
   
   // If searching all platforms, run in parallel for better performance
   if (site === 'all') {
-    console.log(`🚀 Running parallel search across ${platforms.length} platforms`);
+    console.log(`🚀 Running parallel search across ${platforms.length} platforms (full coverage)`);
     
     // Run all platform searches in parallel
     const searchPromises = platforms.map(async (platform) => {
