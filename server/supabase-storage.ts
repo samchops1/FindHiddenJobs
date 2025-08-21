@@ -565,6 +565,25 @@ export class SupabaseStorage implements IStorage {
     }
   }
 
+  async getEmailLogs(userId: string): Promise<{emailType: string, sentAt: Date}[]> {
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('email_logs')
+      .select('email_type, created_at')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching email logs:', error);
+      return [];
+    }
+
+    return data?.map(log => ({
+      emailType: log.email_type,
+      sentAt: new Date(log.created_at)
+    })) || [];
+  }
+
   // Search history functionality
   async logSearchHistory(userId: string, query: string, filters: any, resultsCount: number): Promise<void> {
     if (!supabase) return;

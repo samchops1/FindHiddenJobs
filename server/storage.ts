@@ -118,6 +118,7 @@ export interface IStorage {
   
   // Email logs
   logEmailSent(userId: string, emailType: string, jobUrls: string[]): Promise<void>;
+  getEmailLogs(userId: string): Promise<{emailType: string, sentAt: Date}[]>;
   
   // Search history
   logSearchHistory(userId: string, query: string, filters: any, resultsCount: number): Promise<void>;
@@ -388,6 +389,11 @@ export class MemStorage implements IStorage {
   // Email logs implementation
   async logEmailSent(userId: string, emailType: string, jobUrls: string[]): Promise<void> {
     console.log(`📊 Email logged: ${emailType} sent to user ${userId} with ${jobUrls.length} jobs`);
+  }
+  
+  async getEmailLogs(userId: string): Promise<{emailType: string, sentAt: Date}[]> {
+    // In memory storage doesn't persist email logs, so return empty for first-time user behavior
+    return [];
   }
   
   // Search history implementation
