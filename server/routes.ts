@@ -1333,79 +1333,154 @@ function buildSearchQuery(query: string, site: string, location: string = "all",
   return searchQuery;
 }
 
+// Load balancing system for Google API keys
+class GoogleAPILoadBalancer {
+  public keys: string[] = [
+    'AIzaSyCU15vStl7-t5f-YFfTK_VdBnV8CZpoaqw',
+    'AIzaSyC2CtdRNqX4OQG6q7sPBBhSOX4dwxebO0Q',
+    'AIzaSyBY4plAqPYNxqR-yIWBdaJ-HWvPJZEnqcw',
+    'AIzaSyAbANtDDUEBTnRXn_PF7JNyWFjFa4J4BDU',
+    'AIzaSyBhAWgw5yvY0dV6T7OozPjWipTcv3hpsfA'
+  ];
+  
+  public currentKeyIndex = 0;
+  private keyUsageCount: { [key: string]: number } = {};
+  private keyLastUsed: { [key: string]: number } = {};
+  
+  constructor() {
+    // Initialize usage tracking
+    this.keys.forEach(key => {
+      this.keyUsageCount[key] = 0;
+      this.keyLastUsed[key] = 0;
+    });
+  }
+  
+  getCurrentKey(): string {
+    return this.keys[this.currentKeyIndex];
+  }
+  
+  rotateToNextKey(): void {
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.keys.length;
+    console.log(`🔄 Rotated to API key ${this.currentKeyIndex + 1}/${this.keys.length}`);
+  }
+  
+  markKeyUsed(key: string): void {
+    this.keyUsageCount[key] = (this.keyUsageCount[key] || 0) + 1;
+    this.keyLastUsed[key] = Date.now();
+  }
+  
+  getUsageStats(): void {
+    console.log('📊 API Key Usage Stats:');
+    this.keys.forEach((key, index) => {
+      const shortKey = key.substring(0, 20) + '...';
+      const usage = this.keyUsageCount[key] || 0;
+      const current = index === this.currentKeyIndex ? ' (CURRENT)' : '';
+      console.log(`   Key ${index + 1}: ${usage} requests${current}`);
+    });
+  }
+}
+
+// Global load balancer instance
+const apiLoadBalancer = new GoogleAPILoadBalancer();
+
 async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, timeFilter?: string): Promise<{ results: (InsertJob | string)[]; searchResultDataMap: Map<string, { title: string; snippet: string; url: string }> }> {
-  const API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
   const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
   
   console.log(`🔍 Google API called with query: "${searchQuery}"`);
   
-  if (!API_KEY || !SEARCH_ENGINE_ID) {
-    console.error('❌ Missing Google Search API credentials');
-    console.error(`API Key exists: ${!!API_KEY}`);
+  if (!SEARCH_ENGINE_ID) {
+    console.error('❌ Missing Google Search Engine ID');
     console.error(`Search Engine ID exists: ${!!SEARCH_ENGINE_ID}`);
-    return [];
+    return { results: [], searchResultDataMap: new Map() };
   }
   
-  console.log(`✅ API credentials confirmed, searching from index ${startIndex}`);
+  // Try each API key until one works or we exhaust all keys
+  const maxRetries = apiLoadBalancer.keys.length;
+  let lastError: any = null;
   
-  try {
-    // Build URL with time filter if provided
-    let url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10&start=${startIndex}`;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const currentKey = apiLoadBalancer.getCurrentKey();
+    console.log(`🔑 Using API key ${apiLoadBalancer.currentKeyIndex + 1}/${apiLoadBalancer.keys.length} (attempt ${attempt + 1}/${maxRetries})`);
     
-    // Add time filter parameter if specified
-    if (timeFilter && timeFilter !== 'all') {
-      url += `&tbs=qdr:${timeFilter}`;
-    }
-    
-    // Check cache first
-    const cacheKey = url;
-    const cached = searchCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-      console.log(`📦 Using cached result for: ${searchQuery}`);
-      const data = cached.data;
+    try {
+      // Build URL with time filter if provided
+      let url = `https://www.googleapis.com/customsearch/v1?key=${currentKey}&cx=${SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=10&start=${startIndex}`;
       
-      // Process cached data same as fresh data
+      // Add time filter parameter if specified
+      if (timeFilter && timeFilter !== 'all') {
+        url += `&tbs=qdr:${timeFilter}`;
+      }
+      
+      // Check cache first (using query-based cache key, not URL with API key)
+      const cacheKey = `${searchQuery}_${startIndex}_${timeFilter || 'all'}`;
+      const cached = searchCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+        console.log(`📦 Using cached result for: ${searchQuery}`);
+        const data = cached.data;
+        
+        // Process cached data same as fresh data
+        if (!data.items) {
+          return { results: [], searchResultDataMap: new Map() };
+        }
+        
+        // For cached results, we don't have the search data map, so return empty map
+        const cachedResults: (InsertJob | string)[] = [];
+        // Add basic processing for cached data if needed
+        return { results: cachedResults, searchResultDataMap: new Map() };
+      } else {
+        console.log(`🌐 Making fresh API call: ${url}`);
+        console.log(`🔗 Encoded query: ${encodeURIComponent(searchQuery)}`);
+      }
+        
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Google Search API error: ${response.status}`);
+        console.error(`❌ Error details: ${errorText}`);
+        
+        // If quota exceeded (429), try next key
+        if (response.status === 429) {
+          console.log(`⏰ Quota exceeded for key ${apiLoadBalancer.currentKeyIndex + 1}, trying next key...`);
+          apiLoadBalancer.rotateToNextKey();
+          lastError = { status: 429, error: errorText };
+          continue;
+        }
+        
+        // For other errors, try a simple test with current key
+        if (searchQuery.includes('site:') || searchQuery.includes('inurl:')) {
+          console.log('🔄 Complex query failed, trying simple test query...');
+          const testResult = await testSimpleQuery(currentKey, SEARCH_ENGINE_ID);
+          return { results: testResult, searchResultDataMap: new Map() };
+        }
+        
+        lastError = { status: response.status, error: errorText };
+        apiLoadBalancer.rotateToNextKey();
+        continue;
+      }
+      
+      // Success! Mark key as used and process response
+      apiLoadBalancer.markKeyUsed(currentKey);
+      console.log(`✅ API key ${apiLoadBalancer.currentKeyIndex + 1} successful`);
+      
+      const data = await response.json() as {
+        items?: Array<{
+          link: string;
+          title?: string;
+          snippet?: string;
+        }>;
+      };
+      
+      // Cache the successful result
+      searchCache.set(cacheKey, {
+        data,
+        timestamp: Date.now()
+      });
+      
       if (!data.items) {
+        console.log('No search results found');
         return { results: [], searchResultDataMap: new Map() };
       }
-      
-      // For cached results, we don't have the search data map, so return empty map
-      const cachedResults: (InsertJob | string)[] = [];
-      // Add basic processing for cached data if needed
-      return { results: cachedResults, searchResultDataMap: new Map() };
-    } else {
-      console.log(`🌐 Making fresh API call: ${url}`);
-      console.log(`🔗 Encoded query: ${encodeURIComponent(searchQuery)}`);
-    }
-      
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Google Search API error: ${response.status}`);
-      console.error(`❌ Error details: ${errorText}`);
-      
-      // If it's a complex query, try a simple test
-      if (searchQuery.includes('site:') || searchQuery.includes('inurl:')) {
-        console.log('🔄 Complex query failed, trying simple test query...');
-        return await testSimpleQuery(API_KEY, SEARCH_ENGINE_ID);
-      }
-      
-      return [];
-    }
-    
-    const data = await response.json() as {
-      items?: Array<{
-        link: string;
-        title?: string;
-        snippet?: string;
-      }>;
-    };
-    
-    if (!data.items) {
-      console.log('No search results found');
-      return [];
-    }
     
     // Extract job-related URLs and job objects from search results
     const results: (InsertJob | string)[] = [];
@@ -1587,13 +1662,23 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
       });
     }
     
-    // Return both results and search data map for fallback processing
-    return { results, searchResultDataMap };
-    
-  } catch (error) {
-    console.error('❌ Google Search API network error:', error);
-    return { results: [], searchResultDataMap: new Map() };
+      // Return both results and search data map for fallback processing
+      return { results, searchResultDataMap };
+      
+    } catch (error) {
+      console.error(`❌ Network error with key ${apiLoadBalancer.currentKeyIndex + 1}:`, error);
+      lastError = error;
+      apiLoadBalancer.rotateToNextKey();
+      continue;
+    }
   }
+  
+  // If we get here, all keys failed
+  console.error('❌ All API keys exhausted. Search failed.');
+  apiLoadBalancer.getUsageStats();
+  console.error('❌ Last error:', lastError);
+  
+  return { results: [], searchResultDataMap: new Map() };
 }
 
 // Helper function to create jobs from Google search data when scraping fails
@@ -1637,10 +1722,10 @@ function createJobFromSearchData(
 }
 
 
-async function testSimpleQuery(API_KEY: string, SEARCH_ENGINE_ID: string): Promise<string[]> {
+async function testSimpleQuery(currentKey: string, SEARCH_ENGINE_ID: string): Promise<(InsertJob | string)[]> {
   try {
     console.log('🧪 Testing with very simple query: "jobs"');
-    const testUrl = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${SEARCH_ENGINE_ID}&q=jobs&num=3`;
+    const testUrl = `https://www.googleapis.com/customsearch/v1?key=${currentKey}&cx=${SEARCH_ENGINE_ID}&q=jobs&num=3`;
     const testResponse = await fetch(testUrl);
     
     if (testResponse.ok) {
