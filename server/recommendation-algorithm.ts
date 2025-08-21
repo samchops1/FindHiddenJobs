@@ -100,16 +100,26 @@ export class JobRecommendationEngine {
   private async getCandidateJobs(userProfile: UserProfile): Promise<any[]> {
     const allJobs: any[] = [];
     
+    // Use job types from preferences, or fallback to default types if none specified
+    let jobTypesToSearch = userProfile.jobTypes.length > 0 
+      ? userProfile.jobTypes.slice(0, 3)
+      : ['software engineer', 'developer']; // Fallback for new users
+    
+    console.log(`🔍 Searching for job types: ${jobTypesToSearch.join(', ')}`);
+    
     // Search for jobs based on user's preferred job types
-    for (const jobType of userProfile.jobTypes.slice(0, 3)) { // Limit to top 3 to avoid too many API calls
+    for (const jobType of jobTypesToSearch) {
       try {
         const jobs = await scrapeJobsFromAllPlatforms(
           jobType,
           'all', // Search all platforms
-          userProfile.preferredLocation || 'all'
+          userProfile.preferredLocation || 'all',
+          undefined, // No time filter
+          true // Email recommendation mode - use 1s rate limiting
         );
         
         allJobs.push(...jobs.slice(0, 20)); // Take top 20 from each search
+        console.log(`🔍 Found ${jobs.length} jobs for "${jobType}"`);
       } catch (error) {
         console.error(`Failed to search for ${jobType}:`, error);
       }
@@ -122,7 +132,9 @@ export class JobRecommendationEngine {
           const jobs = await scrapeJobsFromAllPlatforms(
             skill,
             'all',
-            userProfile.preferredLocation || 'all'
+            userProfile.preferredLocation || 'all',
+            undefined, // No time filter
+            true // Email recommendation mode - use 1s rate limiting
           );
           
           allJobs.push(...jobs.slice(0, 10)); // Take top 10 from skill searches

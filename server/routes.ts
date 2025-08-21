@@ -439,7 +439,7 @@ Disallow: /*.css$`);
 
       // Send feature request email to your address
       const featureRequestEmail = {
-        from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
         to: 'sameer.s.chopra@gmail.com',
         subject: `Feature Request: ${title}`,
         html: `
@@ -1842,7 +1842,7 @@ function extractTags(title: string, description: string): string[] {
 }
 
 
-export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string): Promise<InsertJob[]> {
+export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string, isEmailRecommendation?: boolean): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
   
   const platforms = site === 'all' ? [
@@ -1900,35 +1900,62 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
 
   let allJobs: InsertJob[] = [];
   
-  // If searching all platforms, run in parallel for better performance
+  // Choose search strategy based on context
   if (site === 'all') {
-    console.log(`🚀 Running parallel search across ${platforms.length} platforms (full coverage)`);
+    const delay = isEmailRecommendation ? 1000 : 600; // 1s for emails, 600ms for manual
+    console.log(`🚀 Running search across ${platforms.length} platforms (delay: ${delay}ms per platform)`);
     
-    // Run all platform searches in parallel
-    const searchPromises = platforms.map(async (platform) => {
-      try {
-        console.log(`🔍 Starting parallel search on: ${platform}`);
-        const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
-        console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
-        return jobs;
-      } catch (error) {
-        console.error(`❌ Failed to scrape ${platform}:`, error);
-        return []; // Return empty array on failure
+    if (isEmailRecommendation) {
+      // For email recommendations, use sequential search with 1s delays
+      console.log('📧 Email recommendation mode: using sequential search with 1s rate limiting');
+      
+      for (const platform of platforms) {
+        try {
+          console.log(`🔍 Starting sequential search on: ${platform}`);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+          console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
+          allJobs.push(...jobs);
+          
+          // Wait 1 second between each platform search
+          if (platforms.indexOf(platform) < platforms.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.error(`❌ Failed to scrape ${platform}:`, error);
+        }
       }
-    });
-    
-    // Wait for all searches to complete
-    const results = await Promise.allSettled(searchPromises);
-    
-    // Collect all successful results
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        allJobs.push(...result.value);
-        console.log(`📊 Added ${result.value.length} jobs from ${platforms[index]}`);
-      } else if (result.status === 'rejected') {
-        console.error(`⚠️ Platform ${platforms[index]} search was rejected:`, result.reason);
-      }
-    });
+    } else {
+      // For manual searches, use parallel with faster rate limiting
+      console.log('⚡ Manual search mode: using optimized parallel search');
+      
+      const searchPromises = platforms.map(async (platform, index) => {
+        // Stagger the start times to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, index * 600));
+        
+        try {
+          console.log(`🔍 Starting parallel search on: ${platform}`);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+          console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
+          return jobs;
+        } catch (error) {
+          console.error(`❌ Failed to scrape ${platform}:`, error);
+          return []; // Return empty array on failure
+        }
+      });
+      
+      // Wait for all searches to complete
+      const results = await Promise.allSettled(searchPromises);
+      
+      // Collect all successful results
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value) {
+          allJobs.push(...result.value);
+          console.log(`📊 Added ${result.value.length} jobs from ${platforms[index]}`);
+        } else if (result.status === 'rejected') {
+          console.error(`⚠️ Platform ${platforms[index]} search was rejected:`, result.reason);
+        }
+      });
+    }
     
   } else {
     // Single platform search - use existing sequential approach
@@ -1976,9 +2003,9 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       
       allResults.push(...pageResults);
       
-      // Add delay between API calls to respect rate limits
+      // Add delay between API calls to respect rate limits (shorter delay within same platform)
       if (page < 5) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
     

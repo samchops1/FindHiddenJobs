@@ -23,7 +23,7 @@ export class ResendEmailService {
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
-    this.defaultFrom = process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com';
+    this.defaultFrom = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
     if (apiKey) {
       this.resend = new Resend(apiKey);

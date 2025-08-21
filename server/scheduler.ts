@@ -9,7 +9,7 @@ async function generateJobRecommendations(userId: string, jobTypes: string[], li
     const recommendations = await recommendationEngine.generateRecommendations(userId, limit);
     
     // Convert to the format expected by email service
-    const results = recommendations.map(rec => ({
+    return recommendations.map(rec => ({
       title: rec.title,
       company: rec.company,
       location: rec.location,
@@ -18,39 +18,9 @@ async function generateJobRecommendations(userId: string, jobTypes: string[], li
       tags: rec.tags,
       logo: rec.logo
     }));
-    
-    // For testing, always return mock data if no results
-    if (results.length === 0) {
-      throw new Error('No recommendations found, using fallback');
-    }
-    
-    return results;
   } catch (error) {
-    console.error('❌ Recommendation engine failed, falling back to mock data:', error);
-    
-    // Fallback to mock recommendations if the engine fails
-    const mockJobs = [
-      {
-        title: 'Senior Software Engineer',
-        company: 'TechCorp',
-        location: 'San Francisco, CA',
-        url: 'https://example.com/job/1',
-        platform: 'Greenhouse',
-        tags: ['React', 'TypeScript', 'Node.js'],
-        logo: 'https://logo.clearbit.com/techcorp.com'
-      },
-      {
-        title: 'Full Stack Developer',
-        company: 'StartupXYZ',
-        location: 'Remote',
-        url: 'https://example.com/job/2',
-        platform: 'Lever',
-        tags: ['JavaScript', 'Python', 'AWS'],
-        logo: 'https://logo.clearbit.com/startupxyz.com'
-      }
-    ];
-    
-    return mockJobs.slice(0, limit);
+    console.error('❌ Recommendation engine failed:', error);
+    return [];
   }
 }
 
