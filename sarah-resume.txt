@@ -1,0 +1,28 @@
+Sarah Johnson - Senior React Developer
+
+PROFESSIONAL EXPERIENCE:
+Senior Frontend Engineer at Netflix (2022-2024)
+- Led development of React-based streaming platform UI
+- Implemented TypeScript across 50+ components
+- Mentored 3 junior developers
+- Technologies: React, Redux, TypeScript, Jest, Webpack
+
+Full Stack Developer at Spotify (2020-2022)
+- Built music recommendation engine using Python and Django
+- Developed responsive web interfaces with Vue.js
+- Integrated RESTful APIs and GraphQL endpoints
+- Technologies: Python, Django, Vue.js, PostgreSQL, AWS
+
+TECHNICAL SKILLS:
+Frontend: React, Vue.js, TypeScript, JavaScript, HTML5, CSS3, Sass
+Backend: Python, Node.js, Django, Express.js
+Databases: PostgreSQL, MongoDB, Redis
+Cloud: AWS EC2, S3, Lambda, Docker, Kubernetes
+Tools: Git, Jest, Webpack, Jenkins
+
+EDUCATION:
+Master of Science in Computer Science
+UC Berkeley, 2020
+
+CERTIFICATIONS:
+AWS Solutions Architect Associate
