@@ -594,6 +594,68 @@ export class SupabaseStorage implements IStorage {
     // This requires proper RLS policies and service role access
     return [];
   }
+  
+  async getAllUsersWithPreferences(): Promise<Array<{
+    userId: string;
+    email: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+    hasResume: boolean;
+  }>> {
+    if (!supabase) return [];
+
+    try {
+      // Get users with preferences and email notifications enabled
+      const { data: users, error: usersError } = await supabase
+        .from('user_preferences')
+        .select(`
+          user_id,
+          job_types,
+          preferred_location,
+          email_notifications
+        `)
+        .eq('email_notifications', true);
+
+      if (usersError) {
+        console.error('Error fetching users with preferences:', usersError);
+        return [];
+      }
+
+      // Check which users have resumes
+      const { data: resumes, error: resumesError } = await supabase
+        .from('resume_analyses')
+        .select('user_id')
+        .not('analysis', 'is', null);
+
+      if (resumesError) {
+        console.error('Error fetching users with resumes:', resumesError);
+      }
+
+      const usersWithResumes = new Set(resumes?.map(r => r.user_id) || []);
+
+      // Filter users who have job types OR resume
+      const eligibleUsers = (users || [])
+        .filter(user => 
+          user.email_notifications && 
+          ((user.job_types && user.job_types.length > 0) || usersWithResumes.has(user.user_id))
+        )
+        .map(user => ({
+          userId: user.user_id,
+          email: `user-${user.user_id}@example.com`, // TODO: Get real email from users table
+          jobTypes: user.job_types || [],
+          preferredLocation: user.preferred_location,
+          emailNotifications: user.email_notifications,
+          hasResume: usersWithResumes.has(user.user_id)
+        }));
+
+      console.log(`📊 Supabase: Found ${eligibleUsers.length} eligible users for recommendations`);
+      return eligibleUsers;
+    } catch (error) {
+      console.error('Error in getAllUsersWithPreferences:', error);
+      return [];
+    }
+  }
 }
 
 // Create the storage instance

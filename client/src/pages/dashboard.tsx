@@ -15,7 +15,9 @@ import {
   Calendar,
   ExternalLink,
   MapPin,
-  Building
+  Building,
+  Sparkles,
+  Star
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -38,6 +40,16 @@ interface Application {
   appliedAt: Date;
   status: string;
   notes?: string;
+}
+
+interface RecommendedJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  platform: string;
+  tags: string[];
+  logo?: string;
 }
 
 export default function Dashboard() {
@@ -73,6 +85,21 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Fetch recommended jobs
+  const { data: recommendationsData, isLoading: recommendationsLoading } = useQuery({
+    queryKey: ['/api/user/recommendations', user?.id],
+    queryFn: async () => {
+      const response = await fetch('/api/user/recommendations', {
+        headers: {
+          'x-user-id': user!.id
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch recommendations');
+      return response.json();
+    },
+    enabled: !!user,
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -102,6 +129,8 @@ export default function Dashboard() {
 
   const savedJobs = savedJobsData?.savedJobs || [];
   const applications = applicationsData?.applications || [];
+  const recommendedJobs = recommendationsData?.recommendations || [];
+  const recommendationsMessage = recommendationsData?.message;
 
   return (
     <div className="min-h-screen bg-background">

@@ -10,6 +10,7 @@ import fs from "fs";
 import { recommendationScheduler } from "./scheduler";
 import { emailService } from "./email-service";
 import { resumeParser } from "./resume-parser";
+import { recommendationEngine } from "./recommendation-algorithm";
 
 // Simple in-memory cache for Google API results
 const searchCache = new Map<string, { data: any; timestamp: number }>();
@@ -400,6 +401,32 @@ Disallow: /*.css$`);
     } catch (error) {
       console.error('Error fetching applications:', error);
       res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+  });
+
+  // Get personalized job recommendations for dashboard
+  app.get('/api/user/recommendations', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      // Generate recommendations using the same algorithm as daily emails
+      const recommendations = await recommendationEngine.generateRecommendations(userId, 10);
+      
+      if (recommendations.length === 0) {
+        return res.json({ 
+          recommendations: [], 
+          message: 'No recommendations found. Try setting job preferences, uploading a resume, or applying to jobs to get personalized recommendations.' 
+        });
+      }
+
+      res.json({ recommendations });
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({ error: 'Failed to fetch recommendations' });
     }
   });
 

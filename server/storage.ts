@@ -368,6 +368,36 @@ export class MemStorage implements IStorage {
   async logSearchHistory(userId: string, query: string, filters: any, resultsCount: number): Promise<void> {
     console.log(`🔍 Search logged: ${query} by user ${userId} with ${resultsCount} results`);
   }
+  
+  async getAllUsersWithPreferences(): Promise<Array<{
+    userId: string;
+    email: string;
+    jobTypes: string[];
+    preferredLocation?: string;
+    emailNotifications: boolean;
+    hasResume: boolean;
+  }>> {
+    // Get users who have preferences and want email notifications
+    const eligibleUsers = [];
+    
+    for (const [userId, preferences] of this.userPreferences.entries()) {
+      if (preferences.emailNotifications && 
+          (preferences.jobTypes?.length > 0 || 
+           Array.from(this.resumeAnalyses.keys()).some(key => key.startsWith(`${userId}_`)))) {
+        eligibleUsers.push({
+          userId,
+          email: `user-${userId}@example.com`, // In real app, get from user table
+          jobTypes: preferences.jobTypes || [],
+          preferredLocation: preferences.preferredLocation,
+          emailNotifications: preferences.emailNotifications,
+          hasResume: Array.from(this.resumeAnalyses.keys()).some(key => key.startsWith(`${userId}_`))
+        });
+      }
+    }
+    
+    console.log(`📊 Found ${eligibleUsers.length} eligible users for recommendations`);
+    return eligibleUsers;
+  }
 }
 
 import { supabaseStorage } from './supabase-storage';

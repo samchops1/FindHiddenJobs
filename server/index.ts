@@ -78,9 +78,11 @@ app.use((req, res, next) => {
         log(`serving on port ${port}`);
         
         // Start the job recommendation scheduler
-        if (process.env.NODE_ENV !== 'test') {
-          recommendationScheduler.start();
-          log('📅 Job recommendation scheduler started');
+        recommendationScheduler.start();
+        log('📅 Job recommendation scheduler started (9PM EST daily)');
+        
+        if (process.env.NODE_ENV !== 'production') {
+          log('⚠️ Note: In development mode, scheduler runs but respects 9PM EST timing');
         }
       });
       
