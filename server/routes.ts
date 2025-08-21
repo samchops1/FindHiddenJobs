@@ -1964,6 +1964,14 @@ export async function scrapeJobsFromAllPlatformsStreaming(
       
       processedPlatforms++;
       
+      // Send the jobs found for this platform
+      sendEvent?.('jobs', {
+        platform,
+        jobs: jobs,
+        jobsFromPlatform: jobs.length,
+        totalJobsSoFar: allJobs.length
+      });
+      
       sendEvent?.('platform-complete', {
         platform,
         jobsFound: jobs.length,

@@ -29,3 +29,62 @@ export async function getSearchHistory(): Promise<Search[]> {
 export async function cleanupOldJobs(): Promise<void> {
   await apiRequest("DELETE", "/api/jobs/cleanup");
 }
+
+export interface StreamingSearchEvent {
+  type: 'start' | 'progress' | 'jobs' | 'complete' | 'error';
+  data: any;
+}
+
+export function searchJobsStreaming(
+  searchParams: SearchRequest,
+  onEvent: (event: StreamingSearchEvent) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const url = `/api/search-stream?${new URLSearchParams(searchParams as any).toString()}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onEvent({ type: event.type as any || 'message', data });
+      } catch (error) {
+        console.error('Error parsing SSE data:', error);
+      }
+    };
+
+    eventSource.addEventListener('start', (event) => {
+      const data = JSON.parse(event.data);
+      onEvent({ type: 'start', data });
+    });
+
+    eventSource.addEventListener('progress', (event) => {
+      const data = JSON.parse(event.data);
+      onEvent({ type: 'progress', data });
+    });
+
+    eventSource.addEventListener('jobs', (event) => {
+      const data = JSON.parse(event.data);
+      onEvent({ type: 'jobs', data });
+    });
+
+    eventSource.addEventListener('complete', (event) => {
+      const data = JSON.parse(event.data);
+      onEvent({ type: 'complete', data });
+      eventSource.close();
+      resolve();
+    });
+
+    eventSource.addEventListener('error', (event) => {
+      const data = JSON.parse(event.data);
+      onEvent({ type: 'error', data });
+      eventSource.close();
+      reject(new Error(data.error || 'Search failed'));
+    });
+
+    eventSource.onerror = (error) => {
+      console.error('EventSource error:', error);
+      eventSource.close();
+      reject(new Error('Connection error'));
+    };
+  });
+}

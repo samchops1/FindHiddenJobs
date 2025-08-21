@@ -9,18 +9,18 @@ export default function About() {
           <div className="flex items-center justify-between py-4">
             <a href="/" className="flex items-center space-x-3 hover:opacity-90 transition-opacity">
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-600 rounded-xl flex items-center justify-center shadow-lg">
                   <Briefcase className="w-6 h-6 text-white" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full border-2 border-white shadow-sm"></div>
               </div>
               <div className="flex flex-col">
                 <div className="flex items-baseline space-x-1">
-                  <span className="text-2xl font-bold text-blue-600">find</span>
-                  <span className="text-2xl font-bold text-gray-600">hidden</span>
-                  <span className="text-2xl font-bold text-green-600">jobs</span>
+                  <span className="text-2xl font-bold text-primary">find</span>
+                  <span className="text-2xl font-bold text-foreground">hidden</span>
+                  <span className="text-2xl font-bold text-primary">jobs</span>
                 </div>
-                <span className="text-sm text-gray-500 font-medium">.com</span>
+                <span className="text-sm text-muted-foreground font-medium">.com</span>
               </div>
             </a>
             <nav>
