@@ -11,7 +11,10 @@
       "Bash(env)",
       "Bash(pkill -f \"tsx server/index.ts\")",
       "Bash(npm run dev)",
-      "Bash(/bashes)"
+      "Bash(/bashes)",
+      "Bash(curl:*)",
+      "WebFetch(domain:briansjobsearch.com)",
+      "WebFetch(domain:)"
     ],
     "deny": [],
     "ask": []

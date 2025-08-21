@@ -13,14 +13,15 @@ export function JobCard({ job }: JobCardProps) {
     window.open(job.url, '_blank', 'noopener,noreferrer');
   };
 
-  const formatDescription = (description: string) => {
-    // Remove HTML tags and limit length
-    const plainText = description.replace(/<[^>]*>/g, '');
-    return plainText.length > 300 ? plainText.substring(0, 300) + '...' : plainText;
-  };
 
-  const formatDate = (date: Date | null) => {
-    if (!date) return 'Recently posted';
+  const formatDate = (postedAt: Date | null, scrapedAt: Date | null) => {
+    // Use posted date if available, otherwise fall back to scraped date
+    const dateValue = postedAt || scrapedAt;
+    if (!dateValue) return 'Recently posted';
+    
+    // Convert to Date object if it's a string
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return 'Recently posted';
     
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
@@ -43,14 +44,14 @@ export function JobCard({ job }: JobCardProps) {
 
   return (
     <Card className="bg-card hover:shadow-lg border border-border transition-all duration-300 hover:transform hover:scale-[1.01] group">
-      <CardContent className="p-8">
-        <div className="flex items-start space-x-6">
+      <CardContent className="p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-6">
           {/* Company Logo */}
-          <div className="relative">
+          <div className="relative mx-auto sm:mx-0">
             <img 
               src={job.logo || 'https://via.placeholder.com/80x80?text=?'}
               alt={`${job.company} logo`}
-              className="w-20 h-20 rounded-2xl object-cover border border-border flex-shrink-0 bg-muted group-hover:scale-105 transition-transform duration-300"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl object-cover border border-border flex-shrink-0 bg-muted group-hover:scale-105 transition-transform duration-300"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.src = 'https://via.placeholder.com/80x80?text=?';
@@ -60,16 +61,16 @@ export function JobCard({ job }: JobCardProps) {
           </div>
           
           {/* Job Details */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1">
-                <h3 className="text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors duration-200" data-testid={`text-job-title-${job.id}`}>
+                <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors duration-200" data-testid={`text-job-title-${job.id}`}>
                   {job.title}
                 </h3>
-                <p className="text-primary font-semibold text-lg mb-3" data-testid={`text-company-${job.id}`}>
+                <p className="text-primary font-semibold text-base sm:text-lg mb-3" data-testid={`text-company-${job.id}`}>
                   {job.company}
                 </p>
-                <div className="flex items-center space-x-6 text-sm text-muted-foreground mb-4">
+                <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-muted-foreground mb-4">
                   <div className="flex items-center space-x-2">
                     <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                       <MapPin className="w-4 h-4" />
@@ -80,23 +81,17 @@ export function JobCard({ job }: JobCardProps) {
                     <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                       <Calendar className="w-4 h-4" />
                     </div>
-                    <span className="font-medium">{formatDate(job.scrapedAt)}</span>
+                    <span className="font-medium">{formatDate(job.postedAt, job.scrapedAt)}</span>
                   </div>
                 </div>
               </div>
               
               {/* Bookmark Button */}
-              <Button variant="ghost" size="sm" className="ml-4 p-3 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all duration-200">
+              <Button variant="ghost" size="sm" className="sm:ml-4 mt-2 sm:mt-0 p-3 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all duration-200">
                 <Bookmark className="w-5 h-5" />
               </Button>
             </div>
 
-            {/* Job Description Preview */}
-            {job.description && (
-              <div className="text-muted-foreground mb-6 leading-relaxed bg-muted/30 p-4 rounded-xl" data-testid={`text-description-${job.id}`}>
-                <p className="text-sm">{formatDescription(job.description)}</p>
-              </div>
-            )}
 
             {/* Tags */}
             {job.tags && job.tags.length > 0 && (
@@ -115,17 +110,17 @@ export function JobCard({ job }: JobCardProps) {
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-border">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-border space-y-3 sm:space-y-0">
+              <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
                 <Button
                   onClick={handleApply}
-                  className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg transform hover:scale-105"
+                  className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg transform hover:scale-105 w-full sm:w-auto"
                   data-testid={`button-apply-${job.id}`}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Apply Now
                 </Button>
-                <Button variant="outline" size="sm" className="px-4 py-2 rounded-xl border-border hover:bg-muted">
+                <Button variant="outline" size="sm" className="px-4 py-2 rounded-xl border-border hover:bg-muted w-full sm:w-auto">
                   <Share className="w-4 h-4 mr-2" />
                   Share
                 </Button>

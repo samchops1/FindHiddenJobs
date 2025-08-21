@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Briefcase, Building, Search, MapPin } from "lucide-react";
+import { Briefcase, Building, Search, MapPin, Clock } from "lucide-react";
 
 interface JobSearchFormProps {
   onSearch: (params: SearchRequest) => void;
@@ -21,6 +21,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       query: "",
       site: "all",
       location: "all",
+      timeFilter: "all",
     },
   });
 
@@ -55,8 +56,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid md:grid-cols-12 gap-6">
-            <div className="md:col-span-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+            <div className="md:col-span-3">
               <FormField
                 control={form.control}
                 name="query"
@@ -70,8 +71,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Briefcase className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                         <Input
                           {...field}
-                          placeholder="e.g., Software Engineer, Product Manager"
-                          className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                          placeholder="e.g., Software Engineer"
+                          className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                           data-testid="input-job-title"
                         />
                       </div>
@@ -82,7 +83,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <FormField
                 control={form.control}
                 name="site"
@@ -96,20 +97,69 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                             data-testid="select-platform"
                           >
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">🔍 All Platforms</SelectItem>
-                            <SelectItem value="boards.greenhouse.io">🌱 Greenhouse</SelectItem>
-                            <SelectItem value="jobs.lever.co">🎯 Lever</SelectItem>
-                            <SelectItem value="jobs.ashbyhq.com">💼 Ashby</SelectItem>
-                            <SelectItem value="jobs.workable.com">⚡ Workable</SelectItem>
+                          <SelectContent className="max-h-96 overflow-y-auto">
+                            <SelectItem value="all">🔍 All Major Platforms</SelectItem>
+                            
+                            {/* Major ATS Platforms */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Major ATS</div>
+                            <SelectItem value="greenhouse.io">🌱 Greenhouse</SelectItem>
+                            <SelectItem value="lever.co">🎯 Lever</SelectItem>
+                            <SelectItem value="ashbyhq.com">💼 Ashby</SelectItem>
                             <SelectItem value="myworkdayjobs.com">📊 Workday</SelectItem>
+                            <SelectItem value="jobs.workable.com">⚡ Workable</SelectItem>
                             <SelectItem value="adp">🏢 ADP</SelectItem>
+                            <SelectItem value="icims.com">📝 iCIMS</SelectItem>
+                            <SelectItem value="jobvite.com">🎨 Jobvite</SelectItem>
+                            
+                            {/* Newer Platforms */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Modern Platforms</div>
+                            <SelectItem value="remoterocketship.com">🚀 Remote Rocketship</SelectItem>
+                            <SelectItem value="wellfound.com">💡 Wellfound (AngelList)</SelectItem>
+                            <SelectItem value="workatastartup.com">⚡ Y Combinator</SelectItem>
+                            <SelectItem value="builtin.com">🏗️ Built In</SelectItem>
+                            <SelectItem value="rippling-ats.com">💫 Rippling</SelectItem>
+                            <SelectItem value="jobs.gusto.com">🎯 Gusto</SelectItem>
+                            <SelectItem value="dover.io">🌊 Dover</SelectItem>
+                            
+                            {/* HR Platforms */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">HR Systems</div>
+                            <SelectItem value="recruiting.paylocity.com">💰 Paylocity</SelectItem>
+                            <SelectItem value="breezy.hr">🌬️ BreezyHR</SelectItem>
+                            <SelectItem value="applytojob.com">🎺 JazzHR</SelectItem>
+                            <SelectItem value="jobs.smartrecruiters.com">🧠 SmartRecruiters</SelectItem>
+                            <SelectItem value="trinethire.com">🔺 TriNet</SelectItem>
+                            <SelectItem value="recruitee.com">👥 Recruitee</SelectItem>
+                            <SelectItem value="teamtailor.com">✨ Teamtailor</SelectItem>
+                            <SelectItem value="homerun.co">🏃 Homerun</SelectItem>
+                            
+                            {/* Specialized Platforms */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Specialized</div>
+                            <SelectItem value="pinpointhq.com">📍 Pinpoint</SelectItem>
+                            <SelectItem value="keka.com">🎯 Keka</SelectItem>
+                            <SelectItem value="oraclecloud.com">☁️ Oracle Cloud</SelectItem>
+                            <SelectItem value="careerpuck.com">🏒 CareerPuck</SelectItem>
+                            <SelectItem value="jobappnetwork.com">🌐 TalentReef</SelectItem>
+                            <SelectItem value="gem.com">💎 Gem</SelectItem>
+                            <SelectItem value="trakstar.com">⭐ Trakstar</SelectItem>
+                            <SelectItem value="catsone.com">🐱 CATS</SelectItem>
+                            <SelectItem value="notion.site">📝 Notion Sites</SelectItem>
+                            
+                            {/* Major Job Boards */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Job Boards</div>
+                            <SelectItem value="linkedin.com">💼 LinkedIn</SelectItem>
+                            <SelectItem value="glassdoor.com">🚪 Glassdoor</SelectItem>
+                            
+                            {/* Generic Patterns */}
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Generic Patterns</div>
+                            <SelectItem value="jobs.*">🔍 Jobs Subdomains</SelectItem>
                             <SelectItem value="careers.*">🚀 Career Pages</SelectItem>
+                            <SelectItem value="people.*">👥 People Subdomains</SelectItem>
+                            <SelectItem value="talent.*">⭐ Talent Subdomains</SelectItem>
                             <SelectItem value="other-pages">📋 Other Job Pages</SelectItem>
                           </SelectContent>
                         </Select>
@@ -121,7 +171,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <FormField
                 control={form.control}
                 name="location"
@@ -135,7 +185,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-4 text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                             data-testid="select-location"
                           >
                             <SelectValue />
@@ -145,6 +195,47 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                             <SelectItem value="remote">🏠 Remote Only</SelectItem>
                             <SelectItem value="onsite">🏢 On-site Only</SelectItem>
                             <SelectItem value="hybrid">🔄 Hybrid</SelectItem>
+                            <SelectItem value="united-states">🇺🇸 United States</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <FormField
+                control={form.control}
+                name="timeFilter"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium text-gray-700">
+                      Posted Within
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger 
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            data-testid="select-time-filter"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">🕰️ Any Time</SelectItem>
+                            <SelectItem value="h1">🔥 Past Hour</SelectItem>
+                            <SelectItem value="h4">⚡ Past 4 Hours</SelectItem>
+                            <SelectItem value="h8">🌙 Past 8 Hours</SelectItem>
+                            <SelectItem value="h12">🌅 Past 12 Hours</SelectItem>
+                            <SelectItem value="d">📅 Past 24 Hours</SelectItem>
+                            <SelectItem value="h48">📆 Past 48 Hours</SelectItem>
+                            <SelectItem value="h72">🗓️ Past 72 Hours</SelectItem>
+                            <SelectItem value="w">📈 Past Week</SelectItem>
+                            <SelectItem value="m">🗒️ Past Month</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -159,7 +250,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-4 px-8 text-lg rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 md:py-4 px-6 md:px-8 text-base md:text-lg rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
                 data-testid="button-search"
               >
                 <Search className="w-5 h-5 mr-2" />

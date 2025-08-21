@@ -148,7 +148,7 @@ export default function Home() {
           {jobs.length > 0 && (
             <div className="space-y-4" data-testid="job-results">
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard key={job.url} job={job} />
               ))}
             </div>
           )}
