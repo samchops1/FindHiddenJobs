@@ -172,7 +172,17 @@ export default function Home() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => signOut()}
+                      onClick={async () => {
+                        try {
+                          await signOut();
+                          // Force reload to clear any cached state
+                          window.location.href = '/';
+                        } catch (error) {
+                          console.error('Logout failed:', error);
+                          // Force reload anyway to clear state
+                          window.location.href = '/';
+                        }
+                      }}
                       className="flex items-center space-x-1"
                     >
                       <LogOut className="w-4 h-4" />

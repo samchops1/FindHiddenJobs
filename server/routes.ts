@@ -247,7 +247,7 @@ Disallow: /*.css$`);
       console.log(`📄 Serving file from Replit Object Storage: ${fileName} for user ${userId}`);
       
       const { Client } = await import('@replit/object-storage');
-      const client = new Client(process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!);
+      const client = new Client();
       
       // Download the file from Replit Object Storage
       const fileData = await client.downloadAsBytes(fileName);
