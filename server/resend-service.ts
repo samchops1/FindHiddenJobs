@@ -1,7 +1,12 @@
-import { storage } from './storage';
-import { resendEmailService } from './resend-service';
+import { Resend } from 'resend';
 
-// Job recommendation interface
+interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+}
+
 interface JobRecommendation {
   title: string;
   company: string;
@@ -12,87 +17,81 @@ interface JobRecommendation {
   logo?: string;
 }
 
-export class EmailService {
+export class ResendEmailService {
+  private resend: Resend | null = null;
+  private defaultFrom: string;
+
   constructor() {
-    console.log('📧 Email service initialized with Resend integration');
+    const apiKey = process.env.RESEND_API_KEY;
+    this.defaultFrom = process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com';
+
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+      console.log('📧 Resend email service initialized');
+    } else {
+      console.warn('⚠️ RESEND_API_KEY not configured. Emails will be logged to console only.');
+    }
+  }
+
+  async sendEmail({ to, subject, html, from }: EmailOptions): Promise<void> {
+    if (!this.resend) {
+      console.log('📧 Email would be sent via Resend:');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`From: ${from || this.defaultFrom}`);
+      console.log(`HTML length: ${html.length}`);
+      return;
+    }
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: from || this.defaultFrom,
+        to: [to],
+        subject,
+        html,
+      });
+
+      if (error) {
+        console.error('❌ Resend email error:', error);
+        throw new Error(`Failed to send email: ${error.message}`);
+      }
+
+      console.log(`✅ Email sent via Resend to ${to}, ID: ${data?.id}`);
+    } catch (error) {
+      console.error('❌ Failed to send email via Resend:', error);
+      throw error;
+    }
   }
 
   async sendDailyRecommendations(
-    userId: string,
     userEmail: string,
-    recommendations: JobRecommendation[]
+    firstName: string,
+    recommendations: JobRecommendation[],
+    jobTypes: string[] = []
   ): Promise<void> {
-    try {
-      const user = await storage.getUserPreferences(userId);
-      const firstName = userEmail.split('@')[0]; // Fallback name
-      
-      await resendEmailService.sendDailyRecommendations(
-        userEmail,
-        firstName,
-        recommendations,
-        user?.jobTypes || []
-      );
-      
-      // Log the email in storage for tracking
-      await this.logEmailSent(userId, 'daily_recommendations', recommendations.map(r => r.url));
-      
-      console.log(`✅ Daily recommendations sent to ${userEmail}`);
-    } catch (error) {
-      console.error(`❌ Failed to send daily recommendations to ${userEmail}:`, error);
-      throw error;
-    }
+    const emailContent = this.generateRecommendationEmail(firstName, recommendations, jobTypes);
+    const subject = `🎯 Your Daily Job Recommendations - ${new Date().toLocaleDateString()}`;
+
+    await this.sendEmail({
+      to: userEmail,
+      subject,
+      html: emailContent,
+    });
+
+    console.log(`✅ Daily recommendations sent to ${userEmail}`);
   }
 
   async sendWelcomeEmail(userEmail: string, firstName: string): Promise<void> {
-    try {
-      await resendEmailService.sendWelcomeEmail(userEmail, firstName);
-      console.log(`✅ Welcome email sent to ${userEmail}`);
-    } catch (error) {
-      console.error(`❌ Failed to send welcome email to ${userEmail}:`, error);
-      throw error;
-    }
-  }
+    const emailContent = this.generateWelcomeEmail(firstName);
+    const subject = '🎉 Welcome to FindHiddenJobs.com!';
 
-  /**
-   * Send email using Supabase Edge Functions
-   */
-  private async sendEmail(
-    to: string,
-    subject: string,
-    htmlContent: string
-  ): Promise<void> {
-    if (!supabase) {
-      console.log('📧 Email would be sent via Supabase:');
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`HTML length: ${htmlContent.length}`);
-      return;
-    }
-    
-    try {
-      // Call Supabase Edge Function for sending emails
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: {
-          to,
-          subject,
-          html: htmlContent,
-          from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com'
-        }
-      });
-      
-      if (error) {
-        console.error('❌ Supabase email error:', error);
-        throw error;
-      }
-      
-      console.log(`✅ Email sent via Supabase to ${to}`);
-    } catch (error) {
-      console.error('❌ Failed to send email via Supabase:', error);
-      // Fallback to console mode if Supabase fails
-      console.log('📧 Fallback: Email would be sent:');
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-    }
+    await this.sendEmail({
+      to: userEmail,
+      subject,
+      html: emailContent,
+    });
+
+    console.log(`✅ Welcome email sent to ${userEmail}`);
   }
 
   private generateRecommendationEmail(
@@ -219,18 +218,6 @@ export class EmailService {
     </html>
     `;
   }
-
-  private async logEmailSent(
-    userId: string, 
-    emailType: string, 
-    jobUrls: string[]
-  ): Promise<void> {
-    try {
-      await storage.logEmailSent(userId, emailType, jobUrls);
-    } catch (error) {
-      console.error('Failed to log email:', error);
-    }
-  }
 }
 
-export const emailService = new EmailService();
+export const resendEmailService = new ResendEmailService();
