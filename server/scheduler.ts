@@ -124,9 +124,11 @@ export class JobRecommendationScheduler {
           console.log(`✅ Sent recommendations to ${user.email}`);
           
           // Dynamic delay between users to respect API rate limits
+          // Calculate delay based on total users to stay under 100 requests/minute
+          const delayPerUser = Math.max(60000 / users.length, 5000); // Min 5 seconds between users
           if (sentCount < users.length) {
-            console.log(`⏱️ Waiting ${this.userProcessingDelay}ms before processing next user...`);
-            await new Promise(resolve => setTimeout(resolve, this.userProcessingDelay));
+            console.log(`⏱️ Waiting ${delayPerUser}ms before processing next user for rate limiting...`);
+            await new Promise(resolve => setTimeout(resolve, delayPerUser));
           }
         } catch (error) {
           console.error(`❌ Failed to send recommendations to ${user.email}:`, error);

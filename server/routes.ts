@@ -20,7 +20,7 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // In-memory cache for full job search results (for pagination)
 const jobSearchCache = new Map<string, { jobs: any[]; timestamp: number }>();
-const JOB_CACHE_DURATION = 60 * 60 * 1000; // 1 hour - matches Google API cache for scalability
+const JOB_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours - extended cache for scalability
 
 // Configure multer for file uploads
 const upload = multer({
@@ -632,7 +632,13 @@ Disallow: /*.css$`);
         
         try {
           // Use the recommendation algorithm to generate recommendations based on resume
-          const recommendations = await recommendationEngine.generateRecommendations(userId, 10);
+          // Longer timeout since user doesn't need immediate results
+          const recommendations = await Promise.race([
+            recommendationEngine.generateRecommendations(userId, 10),
+            new Promise<any[]>((_, reject) => 
+              setTimeout(() => reject(new Error('Recommendation timeout')), 300000) // 5 minutes
+            )
+          ]);
           
           if (recommendations.length > 0) {
             console.log(`✅ Generated ${recommendations.length} immediate recommendations`);
@@ -737,7 +743,7 @@ Disallow: /*.css$`);
       
       try {
         const { Client } = await import('@replit/object-storage');
-        const client = new Client(process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!);
+        const client = new Client();
         
         const fileBuffer = fs.readFileSync(filePath);
         const fileExtension = path.extname(fileName);
@@ -883,7 +889,7 @@ Disallow: /*.css$`);
 
       // Send feature request email to your address
       const featureRequestEmail = {
-        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
         to: 'sameer.s.chopra@gmail.com',
         subject: `Feature Request: ${title}`,
         html: `
@@ -2307,7 +2313,8 @@ export async function scrapeJobsFromAllPlatformsStreaming(
   site: string, 
   location: string, 
   timeFilter?: string, 
-  sendEvent?: (event: string, data: any) => void
+  sendEvent?: (event: string, data: any) => void,
+  maxResultsPerPlatform?: number
 ): Promise<InsertJob[]> {
   const allJobs: InsertJob[] = [];
   const platforms = site === 'all' ? [
@@ -2326,7 +2333,7 @@ export async function scrapeJobsFromAllPlatformsStreaming(
         message: `Searching ${platform}...`
       });
       
-      const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
+      const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform || 10);
       allJobs.push(...jobs);
       
       processedPlatforms++;
@@ -2428,7 +2435,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
       for (const platform of platforms) {
         try {
           console.log(`🔍 Starting sequential search on: ${platform}`);
-          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform || 10);
           console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
           allJobs.push(...jobs);
           
@@ -2450,7 +2457,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
         
         try {
           console.log(`🔍 Starting parallel search on: ${platform}`);
-          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform);
+          const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform || 10);
           console.log(`✅ Found ${jobs.length} jobs from ${platform}`);
           return jobs;
         } catch (error) {
@@ -2477,7 +2484,7 @@ export async function scrapeJobsFromAllPlatforms(query: string, site: string, lo
     // Single platform search - use existing sequential approach
     console.log(`🔍 Running single platform search on: ${site}`);
     try {
-      const jobs = await scrapeJobsFromPlatform(query, site, location, timeFilter, maxResultsPerPlatform);
+      const jobs = await scrapeJobsFromPlatform(query, site, location, timeFilter, maxResultsPerPlatform || 10);
       console.log(`✅ Found ${jobs.length} jobs from ${site}`);
       allJobs.push(...jobs);
     } catch (error) {

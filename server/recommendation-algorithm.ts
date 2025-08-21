@@ -124,7 +124,7 @@ export class JobRecommendationEngine {
     
     // Get unique job titles from applications (top priority)
     if (userProfile.appliedJobTitles.length > 0) {
-      const uniqueAppliedTitles = [...new Set(userProfile.appliedJobTitles)]
+      const uniqueAppliedTitles = Array.from(new Set(userProfile.appliedJobTitles))
         .slice(0, 2)
         .map(title => title.toLowerCase());
       jobTypesToSearch.push(...uniqueAppliedTitles);
@@ -136,7 +136,7 @@ export class JobRecommendationEngine {
     if (resumeAnalysis && resumeAnalysis.analysis?.suggestedJobTitles?.length > 0) {
       const resumeTitles = resumeAnalysis.analysis.suggestedJobTitles
         .slice(0, 3)
-        .filter(title => !jobTypesToSearch.includes(title.toLowerCase()));
+        .filter((title: string) => !jobTypesToSearch.includes(title.toLowerCase()));
       jobTypesToSearch.push(...resumeTitles);
       console.log(`📄 Adding resume suggested titles: ${resumeTitles.join(', ')}`);
     }
