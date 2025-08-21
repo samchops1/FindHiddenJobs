@@ -56,7 +56,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="md:col-span-2 lg:col-span-2">
               <FormField
                 control={form.control}
