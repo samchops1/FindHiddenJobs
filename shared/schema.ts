@@ -173,7 +173,7 @@ export const loginSchema = z.object({
 export const searchRequestSchema = z.object({
   query: z.string().min(1, "Job title is required"),
   site: z.string().min(1, "Platform is required"),
-  location: z.enum(["all", "remote", "onsite", "hybrid", "united-states"]).default("all"),
+  location: z.enum(["all", "remote", "onsite", "hybrid", "united-states"]).default("all").optional(),
   timeFilter: z.enum(["all", "h1", "h4", "h8", "h12", "d", "h48", "h72", "w", "m"]).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(50).default(25),

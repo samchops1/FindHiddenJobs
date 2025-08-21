@@ -53,6 +53,26 @@ export class EmailService {
     }
   }
 
+  async sendFeatureRequest(
+    to: string,
+    subject: string,
+    html: string,
+    replyTo: string
+  ): Promise<void> {
+    try {
+      await resendEmailService.sendEmail({
+        to,
+        subject,
+        html,
+        replyTo
+      });
+      console.log(`✅ Feature request email sent to ${to}`);
+    } catch (error) {
+      console.error(`❌ Failed to send feature request email to ${to}:`, error);
+      throw error;
+    }
+  }
+
 
   private async logEmailSent(
     userId: string, 

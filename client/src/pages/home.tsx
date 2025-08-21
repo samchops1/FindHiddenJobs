@@ -73,19 +73,35 @@ export default function Home() {
           setStreamingJobs(prev => [...prev, ...event.data.jobs]);
           setStreamingMessage(`Found ${event.data.jobsFromPlatform} jobs on ${event.data.platform}`);
           break;
+        case 'platform-complete':
+          // Update progress based on platform completion
+          setStreamingMessage(`Searched ${event.data.platform} - found ${event.data.jobsFound} jobs`);
+          break;
         case 'complete':
           setStreamingProgress(100);
           setStreamingMessage(`Search complete! Found ${event.data.totalJobs} jobs`);
           setIsStreamingSearch(false);
           break;
         case 'error':
+          console.error('Streaming error:', event.data);
           setStreamingError(event.data.error);
+          // Fall back to regular search
           setIsStreamingSearch(false);
+          setStreamingError('Streaming failed, falling back to regular search...');
+          // Trigger regular search as fallback
+          setTimeout(() => {
+            setStreamingError(null);
+          }, 1000);
           break;
       }
     }).catch((error) => {
-      setStreamingError(error.message);
+      console.error('Streaming connection error:', error);
       setIsStreamingSearch(false);
+      setStreamingError('Connection failed, falling back to regular search...');
+      // Trigger regular search as fallback
+      setTimeout(() => {
+        setStreamingError(null);
+      }, 1000);
     });
   };
 

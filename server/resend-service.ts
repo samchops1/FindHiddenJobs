@@ -5,6 +5,7 @@ interface EmailOptions {
   subject: string;
   html: string;
   from?: string;
+  replyTo?: string;
 }
 
 interface JobRecommendation {
@@ -33,23 +34,30 @@ export class ResendEmailService {
     }
   }
 
-  async sendEmail({ to, subject, html, from }: EmailOptions): Promise<void> {
+  async sendEmail({ to, subject, html, from, replyTo }: EmailOptions): Promise<void> {
     if (!this.resend) {
       console.log('📧 Email would be sent via Resend:');
       console.log(`To: ${to}`);
       console.log(`Subject: ${subject}`);
       console.log(`From: ${from || this.defaultFrom}`);
+      console.log(`Reply-To: ${replyTo || 'N/A'}`);
       console.log(`HTML length: ${html.length}`);
       return;
     }
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      const emailData: any = {
         from: from || this.defaultFrom,
         to: [to],
         subject,
         html,
-      });
+      };
+
+      if (replyTo) {
+        emailData.replyTo = [replyTo];
+      }
+
+      const { data, error } = await this.resend.emails.send(emailData);
 
       if (error) {
         console.error('❌ Resend email error:', error);

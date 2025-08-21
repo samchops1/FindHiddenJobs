@@ -7,8 +7,10 @@ import * as cheerio from "cheerio";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { recommendationScheduler } from "./scheduler";
 import { emailService } from "./email-service";
+import { resendEmailService } from "./resend-service";
 import { resumeParser } from "./resume-parser";
 import { recommendationEngine } from "./recommendation-algorithm";
 
@@ -508,6 +510,61 @@ Disallow: /*.css$`);
     }
   });
 
+  // Test endpoint to send digest email to sameer.s.chopra@gmail.com
+  app.post('/api/test/send-digest-to-sameer', async (req, res) => {
+    try {
+      console.log('🧪 Sending test digest email to sameer.s.chopra@gmail.com...');
+      
+      // Create mock job recommendations for testing (without database dependencies)
+      const mockRecommendations = [
+        {
+          title: 'Senior Software Engineer',
+          company: 'Tech Corp',
+          location: 'Remote',
+          url: 'https://example.com/job1',
+          platform: 'LinkedIn',
+          tags: ['TypeScript', 'React', 'Node.js']
+        },
+        {
+          title: 'Full Stack Developer',
+          company: 'StartupXYZ',
+          location: 'San Francisco, CA',
+          url: 'https://example.com/job2', 
+          platform: 'Indeed',
+          tags: ['JavaScript', 'Express', 'MongoDB']
+        },
+        {
+          title: 'Product Manager',
+          company: 'Big Tech Inc',
+          location: 'New York, NY',
+          url: 'https://example.com/job3',
+          platform: 'AngelList',
+          tags: ['Product Strategy', 'Analytics', 'Leadership']
+        }
+      ];
+      
+      // Send test digest with mock recommendations
+      await resendEmailService.sendDailyRecommendations(
+        'sameer.s.chopra@gmail.com',
+        'Sameer',
+        mockRecommendations,
+        ['Software Engineer', 'Senior Developer', 'Product Manager']
+      );
+      
+      res.json({ 
+        message: 'Test digest email sent successfully to sameer.s.chopra@gmail.com',
+        recommendationsCount: mockRecommendations.length
+      });
+      
+    } catch (error) {
+      console.error('Error sending test digest:', error);
+      res.status(500).json({ 
+        error: 'Failed to send test digest',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Feature request endpoint
   app.post('/api/feature-request', async (req, res) => {
     try {
@@ -587,14 +644,18 @@ Reply to this email to respond directly to ${name} at ${email}
         replyTo: email // Allow direct reply to the requester
       };
 
-      // Send the email (will use console.log in development)
-      if (process.env.NODE_ENV === 'production') {
-        // In production, this would use a real email service
-        console.log('📧 Feature request email would be sent to sameer.s.chopra@gmail.com');
-      } else {
-        // In development, just log the email content
-        console.log('📧 Feature Request Email:');
-        console.log(JSON.stringify(featureRequestEmail, null, 2));
+      // Send the email using the email service
+      try {
+        await emailService.sendFeatureRequest(
+          featureRequestEmail.to,
+          featureRequestEmail.subject,
+          featureRequestEmail.html,
+          featureRequestEmail.replyTo
+        );
+        console.log('✅ Feature request email sent successfully to', featureRequestEmail.to);
+      } catch (emailError) {
+        console.error('❌ Failed to send feature request email:', emailError);
+        // Don't fail the request if email fails, just log it
       }
 
       res.json({ message: 'Feature request submitted successfully' });
