@@ -1875,18 +1875,23 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
     } else if (link.includes('jobs.ashbyhq.com')) {
       platform = 'Ashby';
       
-      // Ashby uses CSS modules with dynamic class names
-      title = $('h1[class*="_title_"]').text().trim() ||
-              $('h1[class*="title"]').text().trim() ||
-              $('h1').first().text().trim() ||
-              $('.job-title').text().trim() ||
-              $('[data-testid="job-title"]').text().trim();
+      // Updated Ashby selectors for 2024+ - they use modern CSS-in-JS with generated class names
+      title = $('[data-testid="job-title"]').text().trim() ||
+              $('h1[data-testid*="title"]').text().trim() ||
+              $('h1').text().trim() ||
+              $('[class*="JobTitle"]').text().trim() ||
+              $('[class*="job-title"]').text().trim() ||
+              $('.posting-headline h1').text().trim() ||
+              $('.job-posting-title').text().trim() ||
+              $('meta[property="og:title"]').attr('content')?.split(' at ')[0] ||
+              $('title').text().split(' | ')[0].split(' at ')[0].trim();
       
-      // Company extraction for Ashby
-      company = $('a[class*="_companyName_"]').text().trim() ||
-                $('[class*="companyName"]').text().trim() ||
-                $('[class*="company"]').text().trim() ||
+      // Company extraction for Ashby - multiple fallback approaches
+      company = $('[data-testid="company-name"]').text().trim() ||
+                $('[data-testid*="company"]').text().trim() ||
+                $('a[data-testid*="company"]').text().trim() ||
                 $('.company-name').text().trim() ||
+                $('[class*="CompanyName"]').text().trim() ||
                 $('meta[property="og:site_name"]').attr('content') ||
                 '';
       
@@ -1901,18 +1906,19 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
         }
       }
       
-      // Location for Ashby
-      location = $('div[class*="_location_"]').text().trim() ||
-                 $('[class*="location"]').text().trim() ||
-                 $('.location').text().trim() ||
-                 $('[data-testid="location"]').text().trim() ||
+      // Location for Ashby - updated selectors
+      location = $('[data-testid="job-location"]').text().trim() ||
+                 $('[data-testid*="location"]').text().trim() ||
+                 $('.job-location').text().trim() ||
+                 $('.posting-location').text().trim() ||
+                 $('[class*="Location"]').text().trim() ||
                  'Location not specified';
       
-      // Description for Ashby
-      description = $('div[class*="_description_"]').html() ||
-                    $('[class*="description"]').html() ||
+      // Description for Ashby - updated selectors
+      description = $('[data-testid="job-description"]').html() ||
                     $('.job-description').html() ||
-                    $('[data-testid="job-description"]').html() ||
+                    $('.posting-description').html() ||
+                    $('[class*="Description"]').html() ||
                     $('.content').html() ||
                     '';
     } else if (link.includes('myworkdayjobs.com')) {
@@ -1960,17 +1966,22 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
     } else if (link.includes('jobs.workable.com')) {
       platform = 'Workable';
       
-      // Workable selectors
-      title = $('h1.job-title').text().trim() ||
-              $('h1').first().text().trim() ||
+      // Updated Workable selectors for 2024+ - they now use data attributes and modern CSS
+      title = $('[data-ui="job-title"]').text().trim() ||
+              $('h1[data-ui*="title"]').text().trim() ||
+              $('h1').text().trim() ||
+              $('.job-title').text().trim() ||
               $('.posting-title').text().trim() ||
-              $('[data-ui="job-title"]').text().trim() ||
-              $('.title').text().trim();
+              $('[class*="JobTitle"]').text().trim() ||
+              $('meta[property="og:title"]').attr('content')?.split(' - ')[0] ||
+              $('title').text().split(' - ')[0].split(' | ')[0].trim();
       
-      // Company extraction for Workable
-      company = $('.company-name').text().trim() ||
-                $('[data-ui="company-name"]').text().trim() ||
+      // Company extraction for Workable - enhanced selectors
+      company = $('[data-ui="company-name"]').text().trim() ||
+                $('[data-ui*="company"]').text().trim() ||
+                $('.company-name').text().trim() ||
                 $('.company').text().trim() ||
+                $('[class*="Company"]').text().trim() ||
                 $('meta[property="og:site_name"]').attr('content') ||
                 '';
       
@@ -1985,17 +1996,19 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
         }
       }
       
-      // Location for Workable
-      location = $('.location').text().trim() ||
-                 $('[data-ui="location"]').text().trim() ||
+      // Location for Workable - updated selectors
+      location = $('[data-ui="job-location"]').text().trim() ||
+                 $('[data-ui*="location"]').text().trim() ||
                  $('.job-location').text().trim() ||
-                 $('[class*="location"]').text().trim() ||
+                 $('.location').text().trim() ||
+                 $('[class*="Location"]').text().trim() ||
                  'Location not specified';
       
-      // Description for Workable
-      description = $('.job-description').html() ||
-                    $('[data-ui="job-description"]').html() ||
+      // Description for Workable - updated selectors
+      description = $('[data-ui="job-description"]').html() ||
+                    $('.job-description').html() ||
                     $('.description').html() ||
+                    $('[class*="Description"]').html() ||
                     $('.content').html() ||
                     $('.posting-content').html() ||
                     '';

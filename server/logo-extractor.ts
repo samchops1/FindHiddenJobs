@@ -84,10 +84,13 @@ function extractLogoFromATS($: cheerio.CheerioAPI, platform: string, url: string
     case 'ashby':
     case 'ashbyhq.com':
       logoSelectors = [
-        '[data-test-id="company-logo"] img',
+        '[data-testid="company-logo"] img',
+        '[data-testid*="logo"] img',
+        '[data-testid*="company"] img',
         '.company-logo img',
         'header img',
-        'img[alt*="logo" i]'
+        'img[alt*="logo" i]',
+        'img[src*="logo" i]'
       ];
       break;
       
@@ -104,10 +107,13 @@ function extractLogoFromATS($: cheerio.CheerioAPI, platform: string, url: string
     case 'workable':
     case 'jobs.workable.com':
       logoSelectors = [
+        '[data-ui="company-logo"] img',
+        '[data-ui*="logo"] img',
         '.company-logo img',
         '.header-logo img',
         'header img[alt*="logo" i]',
-        '.company-header img'
+        '.company-header img',
+        'img[src*="logo" i]'
       ];
       break;
       
@@ -215,16 +221,19 @@ function extractFavicon($: cheerio.CheerioAPI, pageUrl: string): string | null {
 }
 
 /**
- * Get Clearbit logo (existing approach)
+ * Get Clearbit logo (existing approach) with fallback domain logic
  */
 function getClearbitLogo(company: string): string | null {
+  // Clean company name for domain extraction
   const cleanCompany = company
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .replace(/^(the|inc|llc|corp|ltd|co)$/, '')
-    .trim();
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\b(inc|llc|corp|corporation|ltd|limited|co|company|the|and)\b/g, '')
+    .trim()
+    .replace(/\s+/g, '');
     
   if (cleanCompany && cleanCompany.length > 1) {
+    // Try company.com first
     return `https://logo.clearbit.com/${cleanCompany}.com`;
   }
   
