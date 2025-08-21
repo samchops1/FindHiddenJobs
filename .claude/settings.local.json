@@ -31,7 +31,8 @@
       "Bash(pkill:*)",
       "Bash(unset:*)",
       "Bash(npm uninstall:*)",
-      "Bash(timeout 10 curl -s 'http://localhost:5000/api/search-stream?query=frontend%20developer&site=all&timeFilter=all')"
+      "Bash(timeout 10 curl -s 'http://localhost:5000/api/search-stream?query=frontend%20developer&site=all&timeFilter=all')",
+      "Bash(timeout 5 curl -s 'http://localhost:5000/api/search-stream?query=software%20engineer&site=all&timeFilter=all')"
     ],
     "deny": [],
     "ask": []
