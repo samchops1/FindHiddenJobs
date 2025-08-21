@@ -2502,22 +2502,72 @@ export async function scrapeJobsFromAllPlatformsStreaming(
 ): Promise<InsertJob[]> {
   const allJobs: InsertJob[] = [];
   const platforms = site === 'all' ? [
-    'greenhouse.io', 'lever.co', 'ashbyhq.com', 'myworkdayjobs.com', 
-    'jobs.workable.com', 'adp', 'icims.com', 'jobvite.com'
+    // Major ATS Platforms
+    'greenhouse.io',
+    'lever.co',
+    'ashbyhq.com',
+    'myworkdayjobs.com',
+    'jobs.workable.com',
+    'adp',
+    'icims.com',
+    'jobvite.com',
+    
+    // Modern Platforms
+    'remoterocketship.com',
+    'wellfound.com',
+    'workatastartup.com',
+    'builtin.com',
+    'rippling-ats.com',
+    'jobs.gusto.com',
+    'dover.io',
+    
+    // HR Systems
+    'recruiting.paylocity.com',
+    'breezy.hr',
+    'applytojob.com',
+    'jobs.smartrecruiters.com',
+    'trinethire.com',
+    'recruitee.com',
+    'teamtailor.com',
+    'homerun.co',
+    
+    // Specialized
+    'pinpointhq.com',
+    'keka.com',
+    'oraclecloud.com',
+    'careerpuck.com',
+    'jobappnetwork.com',
+    'gem.com',
+    'trakstar.com',
+    'catsone.com',
+    'notion.site',
+    
+    // Job Boards
+    'linkedin.com',
+    'glassdoor.com',
+    
+    // Generic Patterns (these will cover many more sites)
+    'jobs.*',
+    'careers.*',
+    'people.*',
+    'talent.*',
+    'other-pages'
   ] : [site];
   
-  const platformsToSearch = platforms.slice(0, 5); // Limit to first 5 to avoid quotas
-  const totalPlatforms = platformsToSearch.length;
+  const totalPlatforms = platforms.length;
   let processedPlatforms = 0;
+  
+  console.log(`🚀 Starting streaming search across ${totalPlatforms} platforms (600ms delay per platform)`);
+  console.log('⚡ Dashboard search mode: using sequential search with 600ms rate limiting');
   
   // Send initial start event
   sendEvent?.('start', {
     query,
     totalPlatforms,
-    platforms: platformsToSearch.map(p => p.replace('.io', '').replace('.com', '').replace('jobs.', ''))
+    platforms: platforms.map(p => p.replace('.io', '').replace('.com', '').replace('jobs.', ''))
   });
   
-  for (const platform of platformsToSearch) {
+  for (const platform of platforms) {
     try {
       // Send progress before starting each platform
       const progressPercent = Math.round((processedPlatforms / totalPlatforms) * 100);
@@ -2558,9 +2608,9 @@ export async function scrapeJobsFromAllPlatformsStreaming(
         isComplete: processedPlatforms === totalPlatforms
       });
       
-      // Add delay between platforms (except for the last one)
+      // Add 600ms delay between platforms (except for the last one) - dashboard mode
       if (processedPlatforms < totalPlatforms) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     } catch (error) {
       processedPlatforms++; // Still count as processed even if failed
