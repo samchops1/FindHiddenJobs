@@ -56,8 +56,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4">
-            <div className="md:col-span-2 lg:col-span-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="md:col-span-2 lg:col-span-2">
               <FormField
                 control={form.control}
                 name="query"
@@ -72,7 +72,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Input
                           {...field}
                           placeholder="e.g., Software Engineer"
-                          className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                          className="pl-12 py-2.5 text-sm border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
                           data-testid="input-job-title"
                         />
                       </div>
@@ -83,7 +83,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-1">
               <FormField
                 control={form.control}
                 name="site"
@@ -97,7 +97,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
+                            className="pl-12 py-2.5 text-sm border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-platform"
                           >
                             <SelectValue placeholder="🔍 All Major Platforms" />
@@ -171,7 +171,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-1">
               <FormField
                 control={form.control}
                 name="location"
@@ -185,7 +185,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
+                            className="pl-12 py-2.5 text-sm border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-location"
                           >
                             <SelectValue placeholder="🌍 All Locations" />
@@ -220,7 +220,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
+                            className="pl-12 py-2.5 text-sm border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-time-filter"
                           >
                             <SelectValue placeholder="🕰️ Any Time" />
@@ -250,7 +250,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 md:py-4 px-6 md:px-8 text-base md:text-lg rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 px-4 text-sm rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
                 data-testid="button-search"
               >
                 <Search className="w-5 h-5 mr-2" />

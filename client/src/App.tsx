@@ -4,6 +4,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
+import About from "@/pages/about";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -16,6 +19,12 @@ function Router() {
       switch (location) {
         case '/':
           return 'FindHiddenJobs.com - Find Jobs Across All Major Platforms';
+        case '/about':
+          return 'About - FindHiddenJobs.com';
+        case '/privacy':
+          return 'Privacy Policy - FindHiddenJobs.com';
+        case '/terms':
+          return 'Terms of Service - FindHiddenJobs.com';
         default:
           return 'Page Not Found - FindHiddenJobs.com';
       }
@@ -33,6 +42,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/about" component={About} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );

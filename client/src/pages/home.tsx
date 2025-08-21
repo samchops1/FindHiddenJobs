@@ -274,9 +274,15 @@ export default function Home() {
                 Resources
               </h4>
               <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="hover:text-foreground transition-colors cursor-pointer">About</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Privacy Policy</li>
-                <li className="hover:text-foreground transition-colors cursor-pointer">Terms of Service</li>
+                <li>
+                  <a href="/about" className="hover:text-foreground transition-colors">About</a>
+                </li>
+                <li>
+                  <a href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</a>
+                </li>
+                <li>
+                  <a href="/terms" className="hover:text-foreground transition-colors">Terms of Service</a>
+                </li>
               </ul>
             </div>
           </div>
