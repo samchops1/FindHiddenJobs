@@ -56,8 +56,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="md:col-span-2 lg:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4">
+            <div className="md:col-span-2 lg:col-span-3">
               <FormField
                 control={form.control}
                 name="query"
@@ -83,7 +83,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-2">
               <FormField
                 control={form.control}
                 name="site"
@@ -171,7 +171,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-2">
               <FormField
                 control={form.control}
                 name="location"
