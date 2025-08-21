@@ -91,7 +91,7 @@ Disallow: /*.css$`);
       console.log(`🔍 Parsed query params:`, queryParams);
       
       const { query, site, location, timeFilter, page, limit } = searchRequestSchema.parse(queryParams);
-      const normalizedTimeFilter = timeFilter || 'all';
+      const normalizedTimeFilter = (timeFilter || 'all') as string;
       
       console.log(`✅ Schema validation passed: query="${query}", site="${site}", location="${location}", timeFilter="${normalizedTimeFilter}"`);
       
@@ -196,7 +196,7 @@ Disallow: /*.css$`);
   app.get('/api/search-stream', async (req, res) => {
     try {
       const { query, site, location, timeFilter } = searchRequestSchema.parse(req.query);
-      const normalizedTimeFilter = timeFilter || 'all';
+      const normalizedTimeFilter = (timeFilter || 'all') as string;
       
       // Set up Server-Sent Events
       res.setHeader('Content-Type', 'text/event-stream');

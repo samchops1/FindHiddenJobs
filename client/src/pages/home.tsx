@@ -336,7 +336,7 @@ export default function Home() {
           {jobs.length > 0 && (
             <div className="space-y-4" data-testid="job-results">
               {jobs.map((job, index) => (
-                <JobCardEnhanced key={`${job.url}-${index}`} job={job} />
+                <JobCardEnhanced key={`job-${index}-${job.url?.slice(-10) || Math.random()}`} job={job} />
               ))}
             </div>
           )}

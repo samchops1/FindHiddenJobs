@@ -319,8 +319,17 @@ Guidelines:
     }
     
     // Extract basic company/education info using simple patterns
-    const experienceEntries = [];
-    const educationEntries = [];
+    const experienceEntries: Array<{
+      title: string;
+      company: string;
+      duration: string;
+      description: string;
+    }> = [];
+    const educationEntries: Array<{
+      degree: string;
+      school: string;
+      year: string;
+    }> = [];
     
     // Look for company names (basic pattern matching)
     const companyMatches = resumeText.match(/(?:at|@)\s+([A-Z][A-Za-z\s&.,-]+(?:Inc|LLC|Corp|Company|Ltd)?)/g);
@@ -355,7 +364,6 @@ Guidelines:
       keywords: foundSkills,
       suggestedJobTitles: Array.from(suggestedJobTitles).slice(0, 5),
       experienceLevel,
-      summary: `Resume analysis complete. Found ${foundSkills.length} relevant skills and ${experienceLevel} experience level.`
     };
     
     console.log(`📊 Local analysis complete: ${analysis.skills.length} skills, experience level: ${experienceLevel}`);
