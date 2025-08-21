@@ -148,7 +148,7 @@ export default function Home() {
               Find Jobs Across All Major Platforms
             </h1>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Search for jobs across all major platforms simultaneously. Find hidden opportunities on Greenhouse, Lever, Ashby, Workday, and more that aren't posted on LinkedIn or Indeed.
+              Search for jobs across all major platforms simultaneously. Find hidden opportunities on Applicant Tracking Systems (ATS) and more that aren't posted LinkedIn or Indeed.
             </p>
             <div className="flex items-center justify-center space-x-4 mb-8">
               <div className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
