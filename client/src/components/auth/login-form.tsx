@@ -22,9 +22,10 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 interface LoginFormProps {
   onToggleMode: () => void;
+  onSuccess?: () => void;
 }
 
-export function LoginForm({ onToggleMode }: LoginFormProps) {
+export function LoginForm({ onToggleMode, onSuccess }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
@@ -47,12 +48,34 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
         title: 'Welcome back to FindHiddenJobs.com!',
         description: 'You have successfully signed in.',
       });
+      // Close modal and reset form
+      form.reset();
+      onSuccess?.();
     } catch (error) {
-      toast({
-        title: 'Sign in failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      
+      // Check for specific error types
+      if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('Email not confirmed')) {
+        if (errorMessage.includes('Email not confirmed')) {
+          toast({
+            title: 'Please confirm your email',
+            description: 'Check your email for a confirmation link before signing in.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Invalid credentials',
+            description: 'Please check your email and password and try again.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Sign in failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }

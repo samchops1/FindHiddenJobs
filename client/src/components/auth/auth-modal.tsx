@@ -37,9 +37,9 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
         </DialogHeader>
         
         {mode === 'login' ? (
-          <LoginForm onToggleMode={toggleMode} />
+          <LoginForm onToggleMode={toggleMode} onSuccess={onClose} />
         ) : (
-          <RegisterForm onToggleMode={toggleMode} />
+          <RegisterForm onToggleMode={toggleMode} onSuccess={onClose} />
         )}
       </DialogContent>
     </Dialog>

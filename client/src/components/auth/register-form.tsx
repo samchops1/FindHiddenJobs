@@ -24,6 +24,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 interface RegisterFormProps {
   onToggleMode: () => void;
+  onSuccess?: () => void;
 }
 
 const jobTypeOptions = [
@@ -39,7 +40,7 @@ const jobTypeOptions = [
   'Other',
 ];
 
-export function RegisterForm({ onToggleMode }: RegisterFormProps) {
+export function RegisterForm({ onToggleMode, onSuccess }: RegisterFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Basic info, 2: Preferences
@@ -69,13 +70,31 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
         title: 'Welcome to FindHiddenJobs.com!',
         description: 'Check your email for a confirmation link to complete your registration.',
       });
+      // Reset form and close modal
+      form.reset();
+      onSuccess?.();
     } catch (error) {
       console.error('Registration error:', error);
-      toast({
-        title: 'Registration failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      
+      // Check for specific error types
+      if (errorMessage.includes('already registered') || errorMessage.includes('already exists') || errorMessage.includes('duplicate')) {
+        toast({
+          title: 'Account already exists',
+          description: `An account with ${data.email} already exists. Try signing in instead or use a different email.`,
+          variant: 'destructive',
+        });
+        // Suggest switching to login
+        setTimeout(() => {
+          onToggleMode();
+        }, 2000);
+      } else {
+        toast({
+          title: 'Registration failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
