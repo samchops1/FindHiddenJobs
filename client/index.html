@@ -68,5 +68,29 @@
     <script type="module" src="/src/main.tsx"></script>
     <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+    
+    <!-- Source protection (SEO-friendly) -->
+    <script>
+      // Disable right-click context menu
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+      
+      // Disable common developer shortcuts
+      document.addEventListener('keydown', function(e) {
+        // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, Ctrl+Shift+C
+        if (e.keyCode === 123 || 
+            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) ||
+            (e.ctrlKey && e.keyCode === 85) ||
+            (e.ctrlKey && e.shiftKey && e.keyCode === 67)) {
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      // Basic console warning
+      console.warn('🚫 Unauthorized access to developer tools is prohibited.');
+      console.warn('⚠️ This site is protected by copyright. Reverse engineering is not permitted.');
+    </script>
   </body>
 </html>

@@ -3,10 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import pdfParse from 'pdf-parse';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
+// Initialize OpenAI client with fallback check
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️ OPENAI_API_KEY not found in environment variables');
+  console.warn('⚠️ Resume analysis will use fallback mock data');
+}
+
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 export interface ResumeAnalysis {
   skills: string[];
@@ -84,6 +89,11 @@ export class ResumeParser {
    * Analyze resume text using OpenAI GPT
    */
   private async analyzeWithOpenAI(resumeText: string): Promise<ResumeAnalysis> {
+    // Check if OpenAI is available
+    if (!openai) {
+      throw new Error('OpenAI API key not configured. Resume analysis requires valid OpenAI credentials.');
+    }
+    
     try {
       const prompt = `
 Analyze the following resume and extract structured information. Return a JSON object with the exact structure shown below.
@@ -179,20 +189,28 @@ Guidelines:
       return sanitizedAnalysis;
     } catch (error) {
       console.error('OpenAI analysis error:', error);
-      
-      // Return a basic analysis if OpenAI fails
-      const fallbackAnalysis: ResumeAnalysis = {
-        skills: ['Communication', 'Problem Solving', 'Teamwork'],
-        experience: [],
-        education: [],
-        keywords: ['communication', 'problem', 'solving'],
-        suggestedJobTitles: ['Professional', 'Specialist'],
-        experienceLevel: 'mid-level'
-      };
-      
-      return fallbackAnalysis;
+      throw error;
     }
   }
 }
 
 export const resumeParser = new ResumeParser();
+
+// Export a simple function that matches the original interface
+export async function parseResume(fileBuffer: Buffer, fileName: string): Promise<ResumeAnalysis> {
+  // Save buffer to temporary file
+  const tempPath = path.join('/tmp', `temp_${Date.now()}_${fileName}`);
+  fs.writeFileSync(tempPath, fileBuffer);
+  
+  try {
+    const analysis = await resumeParser.parseResume(tempPath, fileName);
+    return analysis;
+  } finally {
+    // Clean up temp file
+    try {
+      fs.unlinkSync(tempPath);
+    } catch (err) {
+      console.warn('Could not delete temp file:', tempPath);
+    }
+  }
+}

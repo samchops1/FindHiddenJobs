@@ -1,4 +1,4 @@
-import { type Job, type InsertJob, type Search, type InsertSearch } from "@shared/schema";
+import { type Job, type InsertJob, type Search, type InsertSearch, type UserPreferences, type SavedJob, type JobApplication, type ResumeAnalysisResult } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {

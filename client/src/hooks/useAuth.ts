@@ -47,7 +47,8 @@ export const useAuthState = () => {
   }, []);
 
   const signUp = async (email: string, password: string, userData: { firstName: string; lastName: string }) => {
-    const { error } = await supabase.auth.signUp({
+    console.log('signUp called with:', { email, userData });
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -57,6 +58,7 @@ export const useAuthState = () => {
         },
       },
     });
+    console.log('Supabase signUp result:', { data, error });
     if (error) throw error;
   };
 

@@ -145,11 +145,21 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
-              Find your next opportunity
+              Find your next opportunity with AI
             </h1>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Search across all major job platforms simultaneously. Get real-time results for jobs that aren't listed on LinkedIn or Indeed.
+              AI-powered job matching across all major platforms. Get personalized recommendations based on your skills, experience, and preferences - jobs that aren't on LinkedIn or Indeed.
             </p>
+            <div className="flex items-center justify-center space-x-4 mb-8">
+              <div className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>✨ AI-Powered Matching</span>
+              </div>
+              <div className="flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Real-time Results</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -168,10 +178,10 @@ export default function Home() {
             <div className="flex items-center justify-between bg-card rounded-2xl p-6 border border-border">
               <div>
                 <h3 className="text-2xl font-bold text-foreground" data-testid="results-title">
-                  Job Opportunities
+                  AI-Matched Job Opportunities
                 </h3>
                 <p className="text-muted-foreground mt-1">
-                  {pagination ? `${pagination.totalJobs} results found` : "Find your perfect match"}
+                  {pagination ? `${pagination.totalJobs} personalized results found` : "AI-powered matching for your perfect job"}
                 </p>
               </div>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted px-3 py-2 rounded-lg">

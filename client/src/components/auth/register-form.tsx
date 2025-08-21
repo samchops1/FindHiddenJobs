@@ -15,9 +15,6 @@ const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  jobTypes: z.array(z.string()).min(1, 'Please select at least one job type'),
-  preferredLocation: z.string().optional(),
-  emailNotifications: z.boolean().default(true),
   agreeToTerms: z.boolean().refine((val) => val === true, {
     message: 'You must agree to the terms of service and privacy policy',
   }),
@@ -56,14 +53,12 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
       password: '',
       firstName: '',
       lastName: '',
-      jobTypes: [],
-      preferredLocation: '',
-      emailNotifications: true,
       agreeToTerms: false,
     },
   });
 
   const onSubmit = async (data: RegisterFormData) => {
+    console.log('Form submitted with data:', data);
     setIsLoading(true);
     try {
       await signUp(data.email, data.password, {
@@ -75,6 +70,7 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
         description: 'We sent you a confirmation link to complete your registration.',
       });
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         title: 'Registration failed',
         description: error instanceof Error ? error.message : 'An error occurred',

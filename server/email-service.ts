@@ -152,7 +152,8 @@ export class EmailService {
       <div class="container">
         <div class="header">
           <h1 style="margin: 0; font-size: 24px;">🎯 Your Daily Job Recommendations</h1>
-          <p style="margin: 10px 0 0 0; opacity: 0.9;">Hi ${firstName}! Here are ${recommendations.length} job opportunities matching ${jobTypesText}</p>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Hi ${firstName}! Here are ${recommendations.length} AI-powered job matches based on ${jobTypesText}</p>
+          <p style="margin: 8px 0 0 0; opacity: 0.8; font-size: 14px;">✨ Powered by AI to match your skills, experience, and preferences</p>
         </div>
         
         <div class="content">
@@ -172,8 +173,9 @@ export class EmailService {
           `).join('')}
           
           <div style="text-align: center; margin-top: 30px; padding-top: 30px; border-top: 1px solid #e5e7eb;">
-            <p style="margin: 0 0 16px 0;">Want to see more opportunities?</p>
-            <a href="https://findhiddenjobs.com/dashboard" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">View Your Dashboard</a>
+            <p style="margin: 0 0 8px 0;">Want to see more opportunities?</p>
+            <p style="margin: 0 0 16px 0; font-size: 14px; color: #6b7280;">Our AI continuously learns from your preferences to improve recommendations</p>
+            <a href="https://findhiddenjobs.com/dashboard" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">View Your AI-Powered Dashboard</a>
           </div>
         </div>
         
