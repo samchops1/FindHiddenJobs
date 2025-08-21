@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
-// import pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 
 // Initialize OpenAI client with fallback check
 if (!process.env.OPENAI_API_KEY) {
@@ -66,8 +66,10 @@ export class ResumeParser {
     
     try {
       if (fileExtension === '.pdf') {
-        // Parse PDF - temporarily disabled
-        throw new Error('PDF parsing is temporarily disabled. Please upload a text file instead.');
+        // Parse PDF
+        const dataBuffer = fs.readFileSync(filePath);
+        const pdfData = await pdfParse(dataBuffer);
+        return pdfData.text;
       } else if (fileExtension === '.docx' || fileExtension === '.doc') {
         // For DOC/DOCX files, we'll try to read as text
         // In production, you might want to use a library like mammoth
