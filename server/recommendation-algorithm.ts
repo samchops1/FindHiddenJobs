@@ -128,14 +128,15 @@ export class JobRecommendationEngine {
           true // Email recommendation mode - use 1s rate limiting
         );
         
-        allJobs.push(...jobs.slice(0, 20)); // Take top 20 from each search
+        allJobs.push(...jobs.slice(0, 5)); // Take top 5 from each search (faster)
         console.log(`🔍 Found ${jobs.length} jobs for "${jobType}"`);
       } catch (error) {
         console.error(`Failed to search for ${jobType}:`, error);
       }
     }
     
-    // If user has skills from resume, also search for those
+    // Skip skill searches for now to speed up recommendations
+    /*
     for (const skill of userProfile.skills.slice(0, 2)) { // Limit to top 2 skills
       if (skill.length > 3) { // Only search for substantial skills
         try {
@@ -153,6 +154,7 @@ export class JobRecommendationEngine {
         }
       }
     }
+    */
     
     return allJobs;
   }

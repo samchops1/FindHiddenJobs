@@ -74,18 +74,21 @@ export const useAuthState = () => {
   const signOut = async () => {
     try {
       console.log('Attempting to sign out...');
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase signOut error:', error);
-        throw error;
-      }
-      console.log('Successfully signed out');
-    } catch (error) {
-      console.error('signOut failed:', error);
-      // Force clear local auth state even if Supabase fails
+      // Force clear local state immediately
       setSession(null);
       setUser(null);
-      throw error;
+      
+      // Try Supabase signOut but don't wait for it or fail if it errors
+      supabase.auth.signOut().catch(error => {
+        console.log('Supabase signOut failed (ignored):', error);
+      });
+      
+      console.log('Successfully signed out (local state cleared)');
+    } catch (error) {
+      console.error('signOut failed:', error);
+      // Ensure local state is cleared regardless
+      setSession(null);
+      setUser(null);
     }
   };
 

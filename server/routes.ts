@@ -545,28 +545,20 @@ Disallow: /*.css$`);
         return res.status(401).json({ error: 'User ID required' });
       }
 
-      // Check if user has received daily recommendations before
-      // This indicates whether the scheduler has run for this user
-      try {
-        const emailLogs = await storage.getEmailLogs?.(userId);
-        const hasReceivedDailyRecommendations = emailLogs?.some(log => log.emailType === 'daily_recommendations');
-        
-        if (!hasReceivedDailyRecommendations) {
-          // First-time user - show "come back at 9pm EST" message
-          return res.json({ 
-            recommendations: [], 
-            message: 'Your personalized AI job recommendations will be ready after 9 PM EST tonight. We\'ll analyze the job market and curate the best opportunities for you based on your preferences and profile.',
-            isFirstTime: true
-          });
-        }
-      } catch (emailLogError) {
-        console.log('Could not check email logs, proceeding with recommendation generation');
-      }
-
-      // Check if user has resume analysis for immediate recommendations  
+      // First, check if user has resume analysis for immediate recommendations  
       const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
       
-      if (resumeAnalysis && resumeAnalysis.analysis.suggestedJobTitles.length > 0) {
+      if (resumeAnalysis && resumeAnalysis.analysis) {
+        console.log('📋 Resume analysis found:', {
+          hasAnalysis: !!resumeAnalysis.analysis,
+          hasSuggestedJobTitles: !!resumeAnalysis.analysis.suggestedJobTitles,
+          suggestedJobTitles: resumeAnalysis.analysis.suggestedJobTitles?.length || 0,
+          hasSkills: !!resumeAnalysis.analysis.skills,
+          skillsCount: resumeAnalysis.analysis.skills?.length || 0
+        });
+      }
+      
+      if (resumeAnalysis && resumeAnalysis.analysis) {
         console.log('🔮 Generating immediate recommendations based on resume analysis...');
         
         try {
@@ -585,6 +577,24 @@ Disallow: /*.css$`);
         } catch (recError) {
           console.log('⚠️ Error generating immediate recommendations:', recError);
         }
+      }
+
+      // Check if user has received daily recommendations before
+      // This indicates whether the scheduler has run for this user
+      try {
+        const emailLogs = await storage.getEmailLogs?.(userId);
+        const hasReceivedDailyRecommendations = emailLogs?.some(log => log.emailType === 'daily_recommendations');
+        
+        if (!hasReceivedDailyRecommendations) {
+          // First-time user - show "come back at 9pm EST" message
+          return res.json({ 
+            recommendations: [], 
+            message: 'Your personalized AI job recommendations will be ready after 9 PM EST tonight. We\'ll analyze the job market and curate the best opportunities for you based on your preferences and profile.',
+            isFirstTime: true
+          });
+        }
+      } catch (emailLogError) {
+        console.log('Could not check email logs, proceeding with recommendation generation');
       }
 
       // Fallback: check for stored recommendations
