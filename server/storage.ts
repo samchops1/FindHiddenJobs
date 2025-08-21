@@ -104,6 +104,12 @@ export interface IStorage {
     analysis: any;
     analyzedAt: Date;
   } | undefined>;
+  
+  // Email logs
+  logEmailSent(userId: string, emailType: string, jobUrls: string[]): Promise<void>;
+  
+  // Search history
+  logSearchHistory(userId: string, query: string, filters: any, resultsCount: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -351,6 +357,16 @@ export class MemStorage implements IStorage {
       analysis: latest.analysis,
       analyzedAt: latest.analyzedAt
     };
+  }
+  
+  // Email logs implementation
+  async logEmailSent(userId: string, emailType: string, jobUrls: string[]): Promise<void> {
+    console.log(`📊 Email logged: ${emailType} sent to user ${userId} with ${jobUrls.length} jobs`);
+  }
+  
+  // Search history implementation
+  async logSearchHistory(userId: string, query: string, filters: any, resultsCount: number): Promise<void> {
+    console.log(`🔍 Search logged: ${query} by user ${userId} with ${resultsCount} results`);
   }
 }
 

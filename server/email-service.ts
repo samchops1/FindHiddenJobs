@@ -212,8 +212,7 @@ export class EmailService {
     jobUrls: string[]
   ): Promise<void> {
     try {
-      // This would typically be implemented in the storage layer
-      console.log(`📊 Email logged: ${emailType} sent to user ${userId} with ${jobUrls.length} jobs`);
+      await storage.logEmailSent(userId, emailType, jobUrls);
     } catch (error) {
       console.error('Failed to log email:', error);
     }
