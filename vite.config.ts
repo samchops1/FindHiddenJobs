@@ -34,7 +34,7 @@ export default defineConfig({
       deny: ["**/.*"],
     },
     hmr: {
-      overlay: false, // Disable error overlay to prevent MetaMask issues
+      overlay: false,
     },
   },
 });

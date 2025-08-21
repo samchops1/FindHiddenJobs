@@ -317,6 +317,33 @@ Disallow: /*.css$`);
     }
   });
 
+  // Get user preferences
+  app.get('/api/user/preferences', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const preferences = await storage.getUserPreferences(userId);
+      
+      if (!preferences) {
+        // Return default preferences if none exist
+        return res.json({
+          jobTypes: ['Software Engineer'],
+          preferredLocation: 'Remote',
+          emailNotifications: true
+        });
+      }
+
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch user preferences' });
+    }
+  });
+
   // User preferences endpoint
   app.post('/api/user/preferences', async (req, res) => {
     try {
@@ -462,8 +489,33 @@ Disallow: /*.css$`);
         console.log('Could not check email logs, proceeding with recommendation generation');
       }
 
-      // Generate recommendations using the same algorithm as daily emails
-      const recommendations = await recommendationEngine.generateRecommendations(userId, 10);
+      // Check if user has resume analysis for immediate recommendations  
+      const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
+      
+      if (resumeAnalysis && resumeAnalysis.analysis.suggestedJobTitles.length > 0) {
+        console.log('🔮 Generating immediate recommendations based on resume analysis...');
+        
+        try {
+          // Use the recommendation algorithm to generate recommendations based on resume
+          const recommendations = await recommendationEngine.generateRecommendations(userId, 10);
+          
+          if (recommendations.length > 0) {
+            console.log(`✅ Generated ${recommendations.length} immediate recommendations`);
+            return res.json({
+              recommendations: recommendations,
+              message: `Found ${recommendations.length} personalized job recommendations based on your resume analysis.`,
+              isFirstTime: false,
+              source: 'resume_analysis'
+            });
+          }
+        } catch (recError) {
+          console.log('⚠️ Error generating immediate recommendations:', recError);
+        }
+      }
+
+      // Fallback: check for stored recommendations
+      const storedRecommendations = await storage.getUserSavedJobs(userId);
+      const recommendations = storedRecommendations || [];
       
       if (recommendations.length === 0) {
         return res.json({ 
