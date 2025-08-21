@@ -145,10 +145,10 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6 leading-tight">
-              Find your next opportunity with AI
+              Find Jobs That Aren't on LinkedIn or Indeed
             </h1>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              AI-powered job matching across all major platforms. Get personalized recommendations based on your skills, experience, and preferences - jobs that aren't on LinkedIn or Indeed.
+              Search across multiple job platforms simultaneously with AI-powered matching. Discover hidden opportunities from company career pages, niche job boards, and specialized platforms.
             </p>
             <div className="flex items-center justify-center space-x-4 mb-8">
               <div className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
