@@ -415,7 +415,7 @@ export class JobRecommendationEngine {
   /**
    * Get cached recommendations for a user
    */
-  private async getCachedRecommendations(userId: string): Promise<JobRecommendation[] | null> {
+  public async getCachedRecommendations(userId: string): Promise<JobRecommendation[] | null> {
     const cached = recommendationCache.get(userId);
     if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
       console.log(`📦 Found valid cached recommendations for user ${userId}`);

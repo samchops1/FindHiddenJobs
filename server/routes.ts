@@ -730,57 +730,47 @@ Disallow: /*.css$`);
         hasSearchHistory: !!hasSearchHistory
       });
       
-      try {
-        // Generate personalized recommendations using the enhanced algorithm
-        const recommendations = await Promise.race([
-          recommendationEngine.generateRecommendations(userId, 10),
-          new Promise<any[]>((_, reject) => 
-            setTimeout(() => reject(new Error('Recommendation timeout')), 180000) // 3 minutes timeout
-          )
-        ]);
+      // Check if we have cached recommendations from the daily 9PM run
+      const cachedRecommendations = await recommendationEngine.getCachedRecommendations(userId);
+      
+      if (cachedRecommendations && cachedRecommendations.length > 0) {
+        console.log(`📦 Returning ${cachedRecommendations.length} cached recommendations from daily run`);
         
-        if (recommendations.length > 0) {
-          console.log(`✅ Generated ${recommendations.length} personalized recommendations`);
-          
-          // Determine the source message based on what data we used
-          let sourceMessage = `Found ${recommendations.length} personalized job recommendations based on your profile and preferences. These update daily at 9PM EST.`;
-          if (hasResume && hasApplicationHistory) {
-            sourceMessage = 'recommendations based on your resume analysis and application history';
-          } else if (hasResume) {
-            sourceMessage = 'recommendations based on your resume analysis';
-          } else if (hasApplicationHistory) {
-            sourceMessage = 'recommendations based on your application history';
-          } else if (hasJobTypes) {
-            sourceMessage = 'recommendations based on your job preferences';
-          }
-          
-          return res.json({
-            recommendations: recommendations,
-            message: sourceMessage,
-            isFirstTime: false,
-            source: 'comprehensive_analysis'
-          });
-        } else {
-          // Algorithm couldn't find recommendations
-          return res.json({
-            recommendations: [],
-            message: 'No matching jobs found right now. We\'ll keep looking and send you daily recommendations at 9 PM EST.',
-            isFirstTime: false,
-            source: 'no_matches'
-          });
-        }
-        
-      } catch (recError) {
-        console.error('⚠️ Error generating recommendations:', recError);
-        
-        // Fallback: show encouraging message for users with profile data
+        // Return cached recommendations with appropriate message
         return res.json({
-          recommendations: [],
-          message: 'We\'re having trouble finding recommendations right now. Your personalized job recommendations will be ready after 9 PM EST tonight when our system completes the daily analysis.',
+          recommendations: cachedRecommendations,
+          message: 'Your daily recommendations are ready! These are refreshed every day at 9PM EST.',
           isFirstTime: false,
-          source: 'error_fallback'
+          lastUpdated: 'Today at 9PM EST'
         });
       }
+      
+      // No cached recommendations - explain when they'll be available
+      const now = new Date();
+      const estOffset = now.getTimezoneOffset() + (5 * 60); // EST is UTC-5
+      const estTime = new Date(now.getTime() - (estOffset * 60 * 1000));
+      const estHour = estTime.getHours();
+      
+      // Calculate time until next 9PM
+      let hoursUntil9PM;
+      if (estHour < 21) {
+        hoursUntil9PM = 21 - estHour;
+      } else {
+        hoursUntil9PM = (24 - estHour) + 21; // Next day
+      }
+      
+      const nextRunTime = hoursUntil9PM === 1 ? 'in about 1 hour' : 
+                         hoursUntil9PM < 12 ? `in about ${hoursUntil9PM} hours` :
+                         'tomorrow evening';
+      
+      console.log(`ℹ️ No cached recommendations found. Next run: ${nextRunTime}`);
+      
+      return res.json({
+        recommendations: [],
+        message: `Your personalized job recommendations will be ready ${nextRunTime} at 9PM EST. We generate fresh recommendations daily based on your profile and preferences.`,
+        isFirstTime: false,
+        nextUpdate: `${nextRunTime} at 9PM EST`
+      });
     } catch (error) {
       console.error('Error fetching recommendations:', error);
       res.status(500).json({ error: 'Failed to fetch recommendations' });
