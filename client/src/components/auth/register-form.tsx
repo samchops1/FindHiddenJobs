@@ -66,8 +66,8 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
         lastName: data.lastName,
       });
       toast({
-        title: 'Check your email!',
-        description: 'We sent you a confirmation link to complete your registration.',
+        title: 'Welcome to FindHiddenJobs.com!',
+        description: 'Check your email for a confirmation link to complete your registration.',
       });
     } catch (error) {
       console.error('Registration error:', error);
@@ -84,8 +84,13 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">Create your account</h2>
-        <p className="text-muted-foreground mt-2">Join FindHiddenJobs.com today</p>
+        <h2 className="text-2xl font-bold text-foreground">Join FindHiddenJobs.com</h2>
+        <p className="text-muted-foreground mt-2">
+          Discover job opportunities that aren't listed on LinkedIn or Indeed
+        </p>
+        <p className="text-sm text-blue-600 font-medium mt-1">
+          Find your next career move with us!
+        </p>
       </div>
 
       <Form {...form}>

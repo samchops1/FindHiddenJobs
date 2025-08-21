@@ -52,6 +52,7 @@ export const useAuthState = () => {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           first_name: userData.firstName,
           last_name: userData.lastName,

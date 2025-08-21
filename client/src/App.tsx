@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import About from "@/pages/about";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import AuthCallback from "@/pages/auth-callback";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -29,6 +30,8 @@ function Router() {
           return 'Privacy Policy - FindHiddenJobs.com';
         case '/terms':
           return 'Terms of Service - FindHiddenJobs.com';
+        case '/auth/callback':
+          return 'Completing Sign Up - FindHiddenJobs.com';
         default:
           return 'Page Not Found - FindHiddenJobs.com';
       }
@@ -50,6 +53,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/auth/callback" component={AuthCallback} />
       <Route component={NotFound} />
     </Switch>
   );

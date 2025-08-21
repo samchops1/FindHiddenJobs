@@ -44,7 +44,7 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     try {
       await signIn(data.email, data.password);
       toast({
-        title: 'Welcome back!',
+        title: 'Welcome back to FindHiddenJobs.com!',
         description: 'You have successfully signed in.',
       });
     } catch (error) {
@@ -62,7 +62,10 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-        <p className="text-muted-foreground mt-2">Sign in to your account</p>
+        <p className="text-muted-foreground mt-2">Sign in to your FindHiddenJobs.com account</p>
+        <p className="text-sm text-blue-600 font-medium mt-1">
+          Continue discovering hidden opportunities
+        </p>
       </div>
 
       <Form {...form}>

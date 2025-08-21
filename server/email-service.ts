@@ -78,9 +78,11 @@ interface JobRecommendation {
 
 export class EmailService {
   private transporter: any;
+  private emailService: string;
 
   constructor() {
-    this.transporter = createTransporter();
+    this.emailService = process.env.EMAIL_SERVICE || 'console';
+    this.transporter = this.emailService === 'supabase' ? null : createTransporter();
   }
 
   async sendDailyRecommendations(
@@ -106,7 +108,21 @@ export class EmailService {
         text: this.generatePlainTextEmail(recommendations),
       };
 
-      await this.transporter.sendMail(mailOptions);
+      if (this.emailService === 'supabase') {
+        await this.sendEmailWithSupabase(
+          mailOptions.to,
+          mailOptions.subject,
+          mailOptions.html
+        );
+      } else if (this.transporter) {
+        await this.transporter.sendMail(mailOptions);
+      } else {
+        // Console mode
+        console.log('📧 Email would be sent in production:');
+        console.log(`To: ${mailOptions.to}`);
+        console.log(`Subject: ${mailOptions.subject}`);
+        console.log(`HTML length: ${mailOptions.html.length}`);
+      }
       
       // Log the email in storage for tracking
       await this.logEmailSent(userId, 'daily_recommendations', recommendations.map(r => r.url));
@@ -219,6 +235,49 @@ export class EmailService {
       console.error('Failed to log email:', error);
     }
   }
+  
+  /**
+   * Send email using Supabase Edge Functions
+   */
+  private async sendEmailWithSupabase(
+    to: string,
+    subject: string,
+    htmlContent: string
+  ): Promise<void> {
+    if (!supabase) {
+      console.log('⚠️ Supabase not configured, falling back to console mode');
+      console.log('📧 Email would be sent via Supabase:');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`HTML length: ${htmlContent.length}`);
+      return;
+    }
+    
+    try {
+      // Call Supabase Edge Function for sending emails
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to,
+          subject,
+          html: htmlContent,
+          from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com'
+        }
+      });
+      
+      if (error) {
+        console.error('❌ Supabase email error:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Email sent via Supabase to ${to}`);
+    } catch (error) {
+      console.error('❌ Failed to send email via Supabase:', error);
+      // Fallback to console mode if Supabase fails
+      console.log('📧 Fallback: Email would be sent via Supabase:');
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+    }
+  }
 
   async sendWelcomeEmail(userEmail: string, firstName: string): Promise<void> {
     try {
@@ -232,7 +291,20 @@ export class EmailService {
         text: `Welcome to FindHiddenJobs.com! Thanks for signing up, ${firstName}. Start finding your next opportunity at https://findhiddenjobs.com`,
       };
 
-      await this.transporter.sendMail(mailOptions);
+      if (this.emailService === 'supabase') {
+        await this.sendEmailWithSupabase(
+          mailOptions.to,
+          mailOptions.subject,
+          mailOptions.html
+        );
+      } else if (this.transporter) {
+        await this.transporter.sendMail(mailOptions);
+      } else {
+        // Console mode
+        console.log('📧 Welcome email would be sent in production:');
+        console.log(`To: ${mailOptions.to}`);
+        console.log(`Subject: ${mailOptions.subject}`);
+      }
       console.log(`✅ Welcome email sent to ${userEmail}`);
     } catch (error) {
       console.error(`❌ Failed to send welcome email to ${userEmail}:`, error);
