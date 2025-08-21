@@ -56,7 +56,7 @@ export default function Home() {
               <img 
                 src={logoImage} 
                 alt="FindHiddenJobs.com" 
-                className="h-16 w-auto" 
+                className="h-24 w-auto" 
                 data-testid="main-logo"
               />
             </div>
