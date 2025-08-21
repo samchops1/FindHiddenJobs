@@ -37,12 +37,13 @@ export default function Home() {
   } = useQuery({
     queryKey: ["/api/search", searchParams, currentPage],
     queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
-    enabled: !!searchParams && !isStreamingSearch,
+    enabled: !!searchParams && !isStreamingSearch && streamingJobs.length === 0,
     staleTime: 60 * 60 * 1000, // 1 hour - matches backend cache
     gcTime: 90 * 60 * 1000, // 1.5 hours - keep cached pages longer
   });
 
-  const jobs = isStreamingSearch ? streamingJobs : (streamingJobs.length > 0 ? streamingJobs : (searchResponse?.jobs || []));
+  // Always show streaming jobs if available, otherwise fallback to regular search results
+  const jobs = streamingJobs.length > 0 ? streamingJobs : (searchResponse?.jobs || []);
   const pagination = searchResponse?.pagination;
 
   const handleSearch = (params: SearchRequest) => {
@@ -62,33 +63,59 @@ export default function Home() {
     searchJobsStreaming(searchParamsWithoutLocation, (event: StreamingSearchEvent) => {
       switch (event.type) {
         case 'start':
-          setStreamingMessage(`Searching for "${event.data.query}"...`);
+          setStreamingMessage(`Searching ${event.data.totalPlatforms} platforms for "${event.data.query}"...`);
+          setStreamingProgress(0);
           break;
         case 'progress':
-          const progress = (event.data.processed / event.data.total) * 100;
-          setStreamingProgress(progress);
-          setStreamingMessage(`Searching ${event.data.platform}...`);
+          setStreamingProgress(event.data.percentage || 0);
+          setStreamingMessage(event.data.message || `Searching ${event.data.platform}...`);
           break;
         case 'jobs':
-          setStreamingJobs(prev => [...prev, ...event.data.jobs]);
-          setStreamingMessage(`Found ${event.data.jobsFromPlatform} jobs on ${event.data.platform}`);
+          // Add new jobs immediately as they're found
+          if (event.data.newJobs && event.data.jobs?.length > 0) {
+            setStreamingJobs(prev => {
+              const newJobs = [...prev, ...event.data.jobs];
+              // Update message to show running total
+              setStreamingMessage(`Found ${event.data.jobsFromPlatform} jobs on ${event.data.platform} (${newJobs.length} total)`);
+              return newJobs;
+            });
+          }
           break;
         case 'platform-complete':
-          // Update progress based on platform completion
-          setStreamingMessage(`Searched ${event.data.platform} - found ${event.data.jobsFound} jobs`);
+          // Update progress and message after each platform completes
+          if (event.data.percentage !== undefined) {
+            setStreamingProgress(event.data.percentage);
+          }
+          if (event.data.isComplete) {
+            setStreamingMessage(`Search complete! Found ${event.data.totalJobs} jobs across all platforms`);
+            setStreamingProgress(100);
+            // Allow a brief moment to show 100% before marking as complete
+            setTimeout(() => {
+              setIsStreamingSearch(false);
+            }, 500);
+          } else {
+            setStreamingMessage(`Completed ${event.data.platform} (${event.data.jobsFound} jobs) - ${event.data.processed}/${event.data.total} platforms`);
+          }
           break;
         case 'complete':
           setStreamingProgress(100);
           setStreamingMessage(`Search complete! Found ${event.data.totalJobs} jobs`);
-          setIsStreamingSearch(false);
+          setTimeout(() => {
+            setIsStreamingSearch(false);
+          }, 500);
+          break;
+        case 'platform-error':
+          // Don't break the whole search for individual platform errors
+          console.warn(`Platform ${event.data.platform} failed:`, event.data.error);
+          if (event.data.percentage !== undefined) {
+            setStreamingProgress(event.data.percentage);
+          }
           break;
         case 'error':
           console.error('Streaming error:', event.data);
           setStreamingError(event.data.error);
-          // Keep the results we've collected so far
           setIsStreamingSearch(false);
           setStreamingError(`Search interrupted. Showing ${streamingJobs.length} results found so far.`);
-          // Clear error after showing it briefly
           setTimeout(() => {
             setStreamingError(null);
           }, 3000);
@@ -270,7 +297,7 @@ export default function Home() {
           )}
 
           {/* Loading State */}
-          {isLoading && !isStreamingSearch && <LoadingSkeleton />}
+          {isLoading && !isStreamingSearch && streamingJobs.length === 0 && <LoadingSkeleton />}
           
           {/* Streaming Progress */}
           {isStreamingSearch && (

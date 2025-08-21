@@ -17,7 +17,13 @@ const getSiteUrl = () => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return 'http://localhost:5000'; // fallback for SSR
+  
+  // Check if we're in production
+  if (import.meta.env.PROD || import.meta.env.VITE_NODE_ENV === 'production') {
+    return 'https://findhiddenjobs.com';
+  }
+  
+  return 'http://localhost:5000'; // fallback for development
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

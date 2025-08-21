@@ -11,18 +11,27 @@ export interface IStorage {
   clearOldJobs(): Promise<void>;
   
   // User preferences
-  saveUserPreferences(preferences: {
-    userId: string;
-    jobTypes: string[];
-    preferredLocation?: string;
-    emailNotifications: boolean;
+  saveUserPreferences(userId: string, preferences: {
+    jobTypes?: string[];
+    industries?: string[];
+    locations?: string[];
+    experienceLevel?: string;
+    workPreference?: string;
+    desiredSalary?: { min?: number; max?: number; currency?: string };
+    emailNotifications?: boolean;
+    onboardingCompleted?: boolean;
   }): Promise<void>;
   
   getUserPreferences(userId: string): Promise<{
     userId: string;
     jobTypes: string[];
-    preferredLocation?: string;
+    industries: string[];
+    locations: string[];
+    experienceLevel: string;
+    workPreference: string;
+    desiredSalary?: { min?: number; max?: number; currency?: string };
     emailNotifications: boolean;
+    onboardingCompleted: boolean;
   } | undefined>;
   
   // Saved jobs
@@ -205,23 +214,60 @@ export class MemStorage implements IStorage {
   }
 
   // User preferences implementation
-  async saveUserPreferences(preferences: {
-    userId: string;
-    jobTypes: string[];
-    preferredLocation?: string;
-    emailNotifications: boolean;
+  async saveUserPreferences(userId: string, preferences: {
+    jobTypes?: string[];
+    industries?: string[];
+    locations?: string[];
+    experienceLevel?: string;
+    workPreference?: string;
+    desiredSalary?: { min?: number; max?: number; currency?: string };
+    emailNotifications?: boolean;
+    onboardingCompleted?: boolean;
   }): Promise<void> {
-    this.userPreferences.set(preferences.userId, {
-      ...preferences,
+    const existing = this.userPreferences.get(userId) || {
+      userId,
+      jobTypes: [],
+      industries: [],
+      locations: [],
+      experienceLevel: 'mid-level',
+      workPreference: 'flexible',
+      emailNotifications: true,
+      onboardingCompleted: false
+    };
+
+    const updated = {
+      ...existing,
+      jobTypes: preferences.jobTypes ?? existing.jobTypes,
+      industries: preferences.industries ?? existing.industries,
+      locations: preferences.locations ?? existing.locations,
+      experienceLevel: preferences.experienceLevel ?? existing.experienceLevel,
+      workPreference: preferences.workPreference ?? existing.workPreference,
+      desiredSalary: preferences.desiredSalary ?? existing.desiredSalary,
+      emailNotifications: preferences.emailNotifications ?? existing.emailNotifications,
+      onboardingCompleted: preferences.onboardingCompleted ?? existing.onboardingCompleted,
       updatedAt: new Date()
+    };
+
+    this.userPreferences.set(userId, updated);
+    console.log(`Saved preferences for user ${userId}:`, {
+      jobTypes: updated.jobTypes.length,
+      industries: updated.industries.length,
+      locations: updated.locations.length,
+      experienceLevel: updated.experienceLevel,
+      onboardingCompleted: updated.onboardingCompleted
     });
   }
 
   async getUserPreferences(userId: string): Promise<{
     userId: string;
     jobTypes: string[];
-    preferredLocation?: string;
+    industries: string[];
+    locations: string[];
+    experienceLevel: string;
+    workPreference: string;
+    desiredSalary?: { min?: number; max?: number; currency?: string };
     emailNotifications: boolean;
+    onboardingCompleted: boolean;
   } | undefined> {
     return this.userPreferences.get(userId);
   }

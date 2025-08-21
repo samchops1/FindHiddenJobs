@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
+import Onboarding from "@/pages/onboarding";
 import About from "@/pages/about";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
@@ -24,6 +25,8 @@ function Router() {
           return 'FindHiddenJobs.com - Find Jobs Across All Major Platforms';
         case '/dashboard':
           return 'Dashboard - FindHiddenJobs.com';
+        case '/onboarding':
+          return 'Complete Your Profile - FindHiddenJobs.com';
         case '/about':
           return 'About - FindHiddenJobs.com';
         case '/privacy':
@@ -50,6 +53,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />

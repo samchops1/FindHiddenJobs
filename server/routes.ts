@@ -13,6 +13,7 @@ import { emailService } from "./email-service";
 import { resendEmailService } from "./resend-service";
 import { resumeParser } from "./resume-parser";
 import { recommendationEngine } from "./recommendation-algorithm";
+import { extractCompanyLogo, extractCompanyWithLogo } from "./logo-extractor";
 
 // Simple in-memory cache for Google API results
 const searchCache = new Map<string, { data: any; timestamp: number }>();
@@ -396,6 +397,55 @@ Disallow: /*.css$`);
     }
   });
 
+  // Find user UUID by email - for development/testing only
+  app.get('/api/find-user/:email', async (req, res) => {
+    try {
+      const email = req.params.email;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+      
+      console.log(`🔍 Looking up user with email: ${email}`);
+      
+      // Check if we can access Supabase directly for auth data
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      if (supabaseUrl && supabaseServiceKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        const { data: userData, error } = await supabase.auth.admin.listUsers();
+        
+        if (error) {
+          console.error('Error fetching users:', error);
+          return res.status(500).json({ error: 'Failed to fetch users' });
+        }
+        
+        const user = userData.users.find(u => u.email === email);
+        
+        if (user) {
+          console.log(`✅ Found user: ${user.id}`);
+          return res.json({
+            id: user.id,
+            email: user.email,
+            created_at: user.created_at,
+            last_sign_in_at: user.last_sign_in_at
+          });
+        } else {
+          return res.status(404).json({ error: 'User not found' });
+        }
+      } else {
+        return res.status(500).json({ error: 'Supabase not configured' });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error finding user:', error);
+      res.status(500).json({ error: 'Failed to find user' });
+    }
+  });
+
   // Simple test endpoint
   app.get('/api/test', (req, res) => {
     res.json({ message: 'API is working', timestamp: new Date().toISOString() });
@@ -614,79 +664,192 @@ Disallow: /*.css$`);
         return res.status(401).json({ error: 'User ID required' });
       }
 
-      // First, check if user has resume analysis for immediate recommendations  
+      console.log(`🎯 Fetching recommendations for user: ${userId}`);
+
+      // Check user profile completeness to determine if we can generate recommendations
+      const preferences = await storage.getUserPreferences(userId);
       const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
+      const applications = await storage.getUserApplications(userId);
+      const savedJobs = await storage.getUserSavedJobs(userId);
       
-      if (resumeAnalysis && resumeAnalysis.analysis) {
-        console.log('📋 Resume analysis found:', {
-          hasAnalysis: !!resumeAnalysis.analysis,
-          hasSuggestedJobTitles: !!resumeAnalysis.analysis.suggestedJobTitles,
-          suggestedJobTitles: resumeAnalysis.analysis.suggestedJobTitles?.length || 0,
-          hasSkills: !!resumeAnalysis.analysis.skills,
-          skillsCount: resumeAnalysis.analysis.skills?.length || 0
+      // Check if user has enough profile data for recommendations
+      const hasJobTypes = preferences?.jobTypes?.length > 0;
+      const hasResume = resumeAnalysis?.analysis?.suggestedJobTitles?.length > 0;
+      const hasApplicationHistory = applications.length > 0;
+      const hasSearchHistory = (await storage.getSearchHistory?.(userId))?.length > 0;
+      
+      const canGenerateRecommendations = hasJobTypes || hasResume || hasApplicationHistory || hasSearchHistory;
+      
+      if (!canGenerateRecommendations) {
+        return res.json({
+          recommendations: [],
+          message: 'Complete your profile to get personalized recommendations! Upload a resume, set job preferences, or start applying to jobs.',
+          isFirstTime: true,
+          actionItems: [
+            'Upload your resume for AI analysis',
+            'Set your preferred job types and location', 
+            'Apply to some jobs to help us understand your interests'
+          ]
         });
       }
       
-      if (resumeAnalysis && resumeAnalysis.analysis) {
-        console.log('🔮 Generating immediate recommendations based on resume analysis...');
-        
-        try {
-          // Use the recommendation algorithm to generate recommendations based on resume
-          // Longer timeout since user doesn't need immediate results
-          const recommendations = await Promise.race([
-            recommendationEngine.generateRecommendations(userId, 10),
-            new Promise<any[]>((_, reject) => 
-              setTimeout(() => reject(new Error('Recommendation timeout')), 300000) // 5 minutes
-            )
-          ]);
-          
-          if (recommendations.length > 0) {
-            console.log(`✅ Generated ${recommendations.length} immediate recommendations`);
-            return res.json({
-              recommendations: recommendations,
-              message: `Found ${recommendations.length} personalized job recommendations based on your resume analysis.`,
-              isFirstTime: false,
-              source: 'resume_analysis'
-            });
-          }
-        } catch (recError) {
-          console.log('⚠️ Error generating immediate recommendations:', recError);
-        }
-      }
-
-      // Check if user has received daily recommendations before
-      // This indicates whether the scheduler has run for this user
+      console.log(`🤖 Generating comprehensive recommendations for user with profile completeness:`, {
+        hasJobTypes,
+        hasResume: !!hasResume,
+        hasApplications: hasApplicationHistory,
+        hasSearchHistory: !!hasSearchHistory
+      });
+      
       try {
-        const emailLogs = await storage.getEmailLogs?.(userId);
-        const hasReceivedDailyRecommendations = emailLogs?.some(log => log.emailType === 'daily_recommendations');
+        // Generate personalized recommendations using the enhanced algorithm
+        const recommendations = await Promise.race([
+          recommendationEngine.generateRecommendations(userId, 10),
+          new Promise<any[]>((_, reject) => 
+            setTimeout(() => reject(new Error('Recommendation timeout')), 180000) // 3 minutes timeout
+          )
+        ]);
         
-        if (!hasReceivedDailyRecommendations) {
-          // First-time user - show "come back at 9pm EST" message
-          return res.json({ 
-            recommendations: [], 
-            message: 'Your personalized AI job recommendations will be ready after 9 PM EST tonight. We\'ll analyze the job market and curate the best opportunities for you based on your preferences and profile.',
-            isFirstTime: true
+        if (recommendations.length > 0) {
+          console.log(`✅ Generated ${recommendations.length} personalized recommendations`);
+          
+          // Determine the source message based on what data we used
+          let sourceMessage = 'personalized job recommendations';
+          if (hasResume && hasApplicationHistory) {
+            sourceMessage = 'recommendations based on your resume analysis and application history';
+          } else if (hasResume) {
+            sourceMessage = 'recommendations based on your resume analysis';
+          } else if (hasApplicationHistory) {
+            sourceMessage = 'recommendations based on your application history';
+          } else if (hasJobTypes) {
+            sourceMessage = 'recommendations based on your job preferences';
+          }
+          
+          return res.json({
+            recommendations: recommendations,
+            message: `Found ${recommendations.length} ${sourceMessage}.`,
+            isFirstTime: false,
+            source: 'comprehensive_analysis'
+          });
+        } else {
+          // Algorithm couldn't find recommendations
+          return res.json({
+            recommendations: [],
+            message: 'No matching jobs found right now. We\'ll keep looking and send you daily recommendations at 9 PM EST.',
+            isFirstTime: false,
+            source: 'no_matches'
           });
         }
-      } catch (emailLogError) {
-        console.log('Could not check email logs, proceeding with recommendation generation');
-      }
-
-      // Fallback: check for stored recommendations
-      const storedRecommendations = await storage.getUserSavedJobs(userId);
-      const recommendations = storedRecommendations || [];
-      
-      if (recommendations.length === 0) {
-        return res.json({ 
-          recommendations: [], 
-          message: 'No recommendations found. Try setting job preferences, uploading a resume, or applying to jobs to get personalized recommendations.' 
+        
+      } catch (recError) {
+        console.error('⚠️ Error generating recommendations:', recError);
+        
+        // Fallback: show encouraging message for users with profile data
+        return res.json({
+          recommendations: [],
+          message: 'We\'re having trouble finding recommendations right now. Your personalized job recommendations will be ready after 9 PM EST tonight when our system completes the daily analysis.',
+          isFirstTime: false,
+          source: 'error_fallback'
         });
       }
-
-      res.json({ recommendations });
     } catch (error) {
       console.error('Error fetching recommendations:', error);
       res.status(500).json({ error: 'Failed to fetch recommendations' });
+    }
+  });
+
+  // Save user job preferences (onboarding)
+  app.post('/api/user/preferences', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const {
+        jobTypes,
+        industries,
+        locations,
+        experienceLevel,
+        workPreference,
+        desiredSalary,
+        emailNotifications
+      } = req.body;
+
+      console.log(`💼 Saving job preferences for user ${userId}:`, {
+        jobTypes: jobTypes?.length || 0,
+        industries: industries?.length || 0,
+        locations: locations?.length || 0,
+        experienceLevel,
+        workPreference
+      });
+
+      // Save preferences to storage
+      await storage.saveUserPreferences(userId, {
+        jobTypes: jobTypes || [],
+        industries: industries || [],
+        locations: locations || [],
+        experienceLevel: experienceLevel || 'mid-level',
+        workPreference: workPreference || 'flexible',
+        desiredSalary: desiredSalary,
+        emailNotifications: emailNotifications !== false,
+        onboardingCompleted: true
+      });
+
+      console.log(`✅ Job preferences saved successfully for user ${userId}`);
+
+      res.json({ 
+        success: true, 
+        message: 'Job preferences saved successfully',
+        preferencesCount: {
+          jobTypes: jobTypes?.length || 0,
+          industries: industries?.length || 0,
+          locations: locations?.length || 0
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error saving job preferences:', error);
+      res.status(500).json({ error: 'Failed to save job preferences' });
+    }
+  });
+
+  // Get user job preferences
+  app.get('/api/user/preferences', async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID required' });
+      }
+
+      const preferences = await storage.getUserPreferences(userId);
+      
+      if (!preferences) {
+        return res.json({ 
+          preferences: null,
+          hasPreferences: false,
+          needsOnboarding: true
+        });
+      }
+
+      res.json({ 
+        preferences: {
+          jobTypes: preferences.jobTypes || [],
+          industries: preferences.industries || [],
+          locations: preferences.locations || [],
+          experienceLevel: preferences.experienceLevel || 'mid-level',
+          workPreference: preferences.workPreference || 'flexible',
+          desiredSalary: preferences.desiredSalary,
+          emailNotifications: preferences.emailNotifications !== false
+        },
+        hasPreferences: true,
+        needsOnboarding: !preferences.onboardingCompleted
+      });
+
+    } catch (error) {
+      console.error('❌ Error fetching job preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch job preferences' });
     }
   });
 
@@ -1241,7 +1404,11 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
           location: extractLocationFromText(item.snippet || item.title || '') || 'Location not specified',
           description: null, // Remove descriptions as requested
           url: link,
-          logo: cleanCompany ? `https://logo.clearbit.com/${cleanCompany}.com` : null,
+          // Enhanced logo extraction for Google search results
+          logo: (() => {
+            const logoResult = extractCompanyLogo(cheerio.load(''), extractedJobTitle.company, link, getPlatformFromUrl(link));
+            return logoResult.logo;
+          })(),
           platform: getPlatformFromUrl(link),
           tags: extractTags(extractedJobTitle.jobTitle, item.snippet || ''),
           postedAt: extractPostingDateFromText(item.snippet || item.title || '')
@@ -1572,11 +1739,9 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
               $('.posting-headline').text().trim() ||
               $('title').text().split(' - ')[0].trim();
       
-      company = $('.company-name').text().trim().replace(/^at\s+/i, '') ||
-                $('[data-automation="jobPostingCompany"]').text().trim() ||
-                $('.organization-name').text().trim() ||
-                metaCompany ||
-                '';
+      // Use enhanced company extraction with logo context
+      const companyData = extractCompanyWithLogo($, link);
+      company = companyData.company || metaCompany || '';
       
       // Extract company from URL if not found in content
       if (!company && link) {
@@ -2002,15 +2167,18 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
 
     // Only return job if we have BOTH title AND company - strict validation
     if (title && company && title.length > 3 && company.length > 1) {
-      const cleanCompany = (company || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
       console.log(`✅ Successfully extracted job: "${title}" at ${company}`);
+      
+      // Enhanced logo extraction using multiple approaches
+      const logoResult = extractCompanyLogo($, company, link, platform);
+      
       return {
         title,
         company,
         location: location || 'Not specified',
         description: description ? description.substring(0, 1000) : null,
         url: link, // Keep original URL for apply button
-        logo: cleanCompany ? `https://logo.clearbit.com/${cleanCompany}.com` : null,
+        logo: logoResult.logo,
         platform,
         tags: extractTags(title, description || ''),
         postedAt
@@ -2338,43 +2506,71 @@ export async function scrapeJobsFromAllPlatformsStreaming(
     'jobs.workable.com', 'adp', 'icims.com', 'jobvite.com'
   ] : [site];
   
+  const platformsToSearch = platforms.slice(0, 5); // Limit to first 5 to avoid quotas
+  const totalPlatforms = platformsToSearch.length;
   let processedPlatforms = 0;
   
-  for (const platform of platforms.slice(0, 5)) { // Limit to first 5 to avoid quotas
+  // Send initial start event
+  sendEvent?.('start', {
+    query,
+    totalPlatforms,
+    platforms: platformsToSearch.map(p => p.replace('.io', '').replace('.com', '').replace('jobs.', ''))
+  });
+  
+  for (const platform of platformsToSearch) {
     try {
+      // Send progress before starting each platform
+      const progressPercent = Math.round((processedPlatforms / totalPlatforms) * 100);
       sendEvent?.('progress', { 
-        platform, 
+        platform: platform.replace('.io', '').replace('.com', '').replace('jobs.', ''), 
         processed: processedPlatforms, 
-        total: Math.min(platforms.length, 5),
-        message: `Searching ${platform}...`
+        total: totalPlatforms,
+        percentage: progressPercent,
+        message: `Searching ${platform.replace('.io', '').replace('.com', '').replace('jobs.', '')}...`
       });
       
       const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter, maxResultsPerPlatform || 10);
       allJobs.push(...jobs);
       
+      // Increment processed platforms
       processedPlatforms++;
       
-      // Send the jobs found for this platform
-      sendEvent?.('jobs', {
-        platform,
-        jobs: jobs,
-        jobsFromPlatform: jobs.length,
-        totalJobsSoFar: allJobs.length
-      });
+      // Send the jobs found for this platform immediately
+      if (jobs.length > 0) {
+        sendEvent?.('jobs', {
+          platform: platform.replace('.io', '').replace('.com', '').replace('jobs.', ''),
+          jobs: jobs,
+          jobsFromPlatform: jobs.length,
+          totalJobsSoFar: allJobs.length,
+          newJobs: true
+        });
+      }
       
+      // Send platform completion
+      const finalProgressPercent = Math.round((processedPlatforms / totalPlatforms) * 100);
       sendEvent?.('platform-complete', {
-        platform,
+        platform: platform.replace('.io', '').replace('.com', '').replace('jobs.', ''),
         jobsFound: jobs.length,
-        totalJobs: allJobs.length
+        totalJobs: allJobs.length,
+        processed: processedPlatforms,
+        total: totalPlatforms,
+        percentage: finalProgressPercent,
+        isComplete: processedPlatforms === totalPlatforms
       });
       
-      // Add delay between platforms
-      if (processedPlatforms < Math.min(platforms.length, 5)) {
+      // Add delay between platforms (except for the last one)
+      if (processedPlatforms < totalPlatforms) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (error) {
+      processedPlatforms++; // Still count as processed even if failed
       console.error(`❌ Failed to search ${platform}:`, error);
-      sendEvent?.('platform-error', { platform, error: error instanceof Error ? error.message : 'Unknown error' });
+      sendEvent?.('platform-error', { 
+        platform: platform.replace('.io', '').replace('.com', '').replace('jobs.', ''), 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processed: processedPlatforms,
+        total: totalPlatforms
+      });
     }
   }
   

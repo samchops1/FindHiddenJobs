@@ -10,6 +10,11 @@ export interface UserProfile {
   appliedJobTitles: string[];
   savedJobTitles: string[];
   recentSearches: string[];
+  industries: string[];
+  desiredSalary?: { min?: number; max?: number; currency?: string };
+  resumeSuggestedTitles: string[];
+  workPreference: string;
+  allPreferredLocations: string[];
 }
 
 export interface JobRecommendation {
@@ -96,121 +101,144 @@ export class JobRecommendationEngine {
     // Get resume analysis if available
     const resumeAnalysis = await storage.getUserResumeAnalysis(userId);
     
+    // Get search history for additional context
+    const searchHistory = await storage.getSearchHistory?.(userId) || [];
+    const recentSearches = searchHistory.slice(0, 5).map(search => search.query.toLowerCase());
+    
     return {
       userId,
       jobTypes: preferences?.jobTypes || [],
-      preferredLocation: preferences?.preferredLocation,
+      preferredLocation: preferences?.locations?.[0] || preferences?.workPreference === 'remote' ? 'remote' : undefined,
       skills: resumeAnalysis?.analysis?.skills || [],
-      experienceLevel: resumeAnalysis?.analysis?.experienceLevel || 'mid-level',
+      experienceLevel: preferences?.experienceLevel || resumeAnalysis?.analysis?.experienceLevel || 'mid-level',
       appliedJobTitles,
       savedJobTitles,
-      recentSearches: [] // Could be populated from search history
+      recentSearches,
+      // Enhanced fields from onboarding
+      industries: preferences?.industries || [],
+      desiredSalary: preferences?.desiredSalary,
+      resumeSuggestedTitles: resumeAnalysis?.analysis?.suggestedJobTitles || [],
+      workPreference: preferences?.workPreference || 'flexible',
+      allPreferredLocations: preferences?.locations || []
     };
   }
 
   /**
-   * Get candidate jobs based on user preferences
+   * Get candidate jobs based on comprehensive user preferences
    */
   private async getCandidateJobs(userProfile: UserProfile): Promise<any[]> {
     const allJobs: any[] = [];
     const seenUrls = new Set<string>();
     
-    // Determine job titles to search - prioritize based on:
-    // 1. Applied job titles (what they've shown interest in)
-    // 2. Resume suggested titles
-    // 3. User preferences
-    // 4. Default fallback
+    // Build comprehensive job title list from multiple sources
     let jobTypesToSearch: string[] = [];
     
-    // Get unique job titles from applications (top priority)
+    // Priority 1: Resume-suggested job titles (AI analyzed from resume)
+    if (userProfile.resumeSuggestedTitles.length > 0) {
+      jobTypesToSearch.push(...userProfile.resumeSuggestedTitles.slice(0, 3));
+      console.log(`📄 Using resume-suggested titles: ${userProfile.resumeSuggestedTitles.slice(0, 3).join(', ')}`);
+    }
+    
+    // Priority 2: Recent job applications (showing active interest)
     if (userProfile.appliedJobTitles.length > 0) {
       const uniqueAppliedTitles = Array.from(new Set(userProfile.appliedJobTitles))
-        .slice(0, 2)
-        .map(title => title.toLowerCase());
+        .filter(title => !jobTypesToSearch.some(existing => 
+          existing.toLowerCase() === title.toLowerCase()
+        ))
+        .slice(0, 2);
       jobTypesToSearch.push(...uniqueAppliedTitles);
-      console.log(`📝 Using applied job titles: ${uniqueAppliedTitles.join(', ')}`);
+      console.log(`📝 Adding applied job titles: ${uniqueAppliedTitles.join(', ')}`);
     }
     
-    // Add resume suggested titles
-    const resumeAnalysis = await storage.getUserResumeAnalysis(userProfile.userId);
-    if (resumeAnalysis && resumeAnalysis.analysis?.suggestedJobTitles?.length > 0) {
-      const resumeTitles = resumeAnalysis.analysis.suggestedJobTitles
-        .slice(0, 3)
-        .filter((title: string) => !jobTypesToSearch.includes(title.toLowerCase()));
-      jobTypesToSearch.push(...resumeTitles);
-      console.log(`📄 Adding resume suggested titles: ${resumeTitles.join(', ')}`);
-    }
-    
-    // Add user preferences if we still need more
-    if (userProfile.jobTypes.length > 0 && jobTypesToSearch.length < 5) {
+    // Priority 3: User preference job types
+    if (userProfile.jobTypes.length > 0 && jobTypesToSearch.length < 6) {
       const prefTitles = userProfile.jobTypes
-        .slice(0, 2)
-        .filter(title => !jobTypesToSearch.includes(title.toLowerCase()));
+        .filter(title => !jobTypesToSearch.some(existing => 
+          existing.toLowerCase().includes(title.toLowerCase())
+        ))
+        .slice(0, 3);
       jobTypesToSearch.push(...prefTitles);
+      console.log(`⚙️ Adding preference job types: ${prefTitles.join(', ')}`);
     }
     
-    // Ensure we have at least some titles to search
+    // Priority 4: Recent searches (showing current interest)
+    if (userProfile.recentSearches.length > 0 && jobTypesToSearch.length < 7) {
+      const recentTitles = userProfile.recentSearches
+        .filter(search => !jobTypesToSearch.some(existing => 
+          existing.toLowerCase().includes(search.toLowerCase())
+        ))
+        .slice(0, 2);
+      jobTypesToSearch.push(...recentTitles);
+      console.log(`🔍 Adding recent search terms: ${recentTitles.join(', ')}`);
+    }
+    
+    // Fallback if no profile data
     if (jobTypesToSearch.length === 0) {
       jobTypesToSearch = ['software engineer', 'developer'];
+      console.log(`🔧 Using fallback titles: ${jobTypesToSearch.join(', ')}`);
     }
     
-    // Limit to 5 job titles maximum for scalability
-    jobTypesToSearch = jobTypesToSearch.slice(0, 5);
+    // Limit for scalability and rate limiting
+    jobTypesToSearch = jobTypesToSearch.slice(0, 8);
+    console.log(`🎯 Final search titles (${jobTypesToSearch.length}): ${jobTypesToSearch.join(', ')}`);
     
-    console.log(`🔍 Searching for ${jobTypesToSearch.length} job titles: ${jobTypesToSearch.join(', ')}`);
-    
-    // Search for jobs - limit to 5 results per title for each platform
-    for (const jobType of jobTypesToSearch) {
+    // Search for jobs with progressive results allocation
+    for (let i = 0; i < jobTypesToSearch.length; i++) {
+      const jobTitle = jobTypesToSearch[i];
+      
       try {
+        // Allocate more results to higher priority sources
+        let resultsPerPlatform = 5; // Default
+        if (i < 3) resultsPerPlatform = 8; // Higher for first 3 (resume + applications)
+        if (i >= 6) resultsPerPlatform = 3; // Lower for later titles
+        
+        console.log(`🔍 Searching for "${jobTitle}" (${resultsPerPlatform} per platform)...`);
+        
         const jobs = await scrapeJobsFromAllPlatforms(
-          jobType,
+          jobTitle,
           'all', // Search all platforms
           userProfile.preferredLocation?.toLowerCase() || 'all',
           undefined, // No time filter
           true, // Email recommendation mode - use rate limiting
-          5 // Limit to 5 results per platform
+          resultsPerPlatform
         );
         
-        // Deduplicate and add jobs
+        // Deduplicate and add jobs with source tracking
+        let newJobsCount = 0;
         for (const job of jobs) {
           if (!seenUrls.has(job.url)) {
             seenUrls.add(job.url);
-            allJobs.push(job);
+            allJobs.push({
+              ...job,
+              // Mark the search source for scoring
+              searchSource: i < 3 ? 'primary' : 'secondary',
+              searchTitle: jobTitle,
+              sourceIndex: i
+            });
+            newJobsCount++;
           }
         }
         
-        console.log(`✅ Found ${jobs.length} unique jobs for "${jobType}"`);
+        console.log(`✅ Found ${newJobsCount} new unique jobs for "${jobTitle}"`);
         
-        // Add delay between searches to respect rate limits
-        if (jobTypesToSearch.indexOf(jobType) < jobTypesToSearch.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // Progressive delay based on position (more important searches get less delay)
+        const delay = i < 3 ? 1500 : 2000;
+        if (i < jobTypesToSearch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
+        
+        // Stop early if we have enough jobs for processing
+        if (allJobs.length >= 200) {
+          console.log(`🛑 Stopping search early - reached ${allJobs.length} candidate jobs`);
+          break;
+        }
+        
       } catch (error) {
-        console.error(`Failed to search for ${jobType}:`, error);
+        console.error(`❌ Failed to search for "${jobTitle}":`, error);
       }
     }
     
-    // Skip skill searches for now to speed up recommendations
-    /*
-    for (const skill of userProfile.skills.slice(0, 2)) { // Limit to top 2 skills
-      if (skill.length > 3) { // Only search for substantial skills
-        try {
-          const jobs = await scrapeJobsFromAllPlatforms(
-            skill,
-            'all',
-            userProfile.preferredLocation?.toLowerCase() || 'all',
-            undefined, // No time filter
-            true // Email recommendation mode - use 1s rate limiting
-          );
-          
-          allJobs.push(...jobs.slice(0, 10)); // Take top 10 from skill searches
-        } catch (error) {
-          console.error(`Failed to search for skill ${skill}:`, error);
-        }
-      }
-    }
-    */
-    
+    console.log(`📊 Total candidate jobs found: ${allJobs.length}`);
     return allJobs;
   }
 
@@ -222,12 +250,32 @@ export class JobRecommendationEngine {
       let score = 50; // Base score
       const reasons: string[] = [];
       
-      // Job type matching
+      // Job type matching - check user preferences AND resume suggested titles
       const jobTitle = job.title.toLowerCase();
+      
+      // Check against user's preferred job types
       for (const preferredType of userProfile.jobTypes) {
         if (jobTitle.includes(preferredType.toLowerCase())) {
           score += 20;
           reasons.push(`Matches your interest in ${preferredType}`);
+          break;
+        }
+      }
+      
+      // Check against resume-suggested titles (higher weight as they're AI-analyzed)
+      for (const suggestedTitle of userProfile.resumeSuggestedTitles) {
+        if (jobTitle.includes(suggestedTitle.toLowerCase())) {
+          score += 25;
+          reasons.push(`Matches resume-suggested role: ${suggestedTitle}`);
+          break;
+        }
+      }
+      
+      // Check against recent searches (shows active interest)
+      for (const searchTerm of userProfile.recentSearches) {
+        if (jobTitle.includes(searchTerm.toLowerCase())) {
+          score += 15;
+          reasons.push(`Matches your recent search for ${searchTerm}`);
           break;
         }
       }
@@ -250,17 +298,51 @@ export class JobRecommendationEngine {
       }
       score += Math.min(skillMatches * 8, 30); // Up to 30 points for skills
       
-      // Location preference
-      if (userProfile.preferredLocation) {
-        const prefLocation = userProfile.preferredLocation.toLowerCase();
-        const jobLocation = (job.location || '').toLowerCase();
-        
+      // Industry matching
+      if (userProfile.industries.length > 0) {
+        const jobInfo = `${jobTitle} ${jobDescription} ${job.company.toLowerCase()}`.toLowerCase();
+        for (const industry of userProfile.industries) {
+          if (jobInfo.includes(industry.toLowerCase())) {
+            score += 12;
+            reasons.push(`Matches your ${industry} industry interest`);
+            break;
+          }
+        }
+      }
+      
+      // Search source priority (primary AI-optimized titles score higher)
+      if (job.searchSource === 'primary') {
+        score += 8;
+        reasons.push(`High relevance match for "${job.searchTitle}"`);
+      } else if (job.searchSource === 'secondary') {
+        score += 4;
+      }
+      
+      // Location and work preference matching
+      const jobLocation = (job.location || '').toLowerCase();
+      const workPref = userProfile.workPreference.toLowerCase();
+      const allLocations = userProfile.allPreferredLocations.map(loc => loc.toLowerCase());
+      
+      // Work preference matching
+      if (workPref === 'remote' && jobLocation.includes('remote')) {
+        score += 20;
+        reasons.push(`Remote work as preferred`);
+      } else if (workPref === 'hybrid' && (jobLocation.includes('hybrid') || jobLocation.includes('remote'))) {
+        score += 15;
+        reasons.push(`Hybrid/remote work option available`);
+      } else if (workPref === 'onsite' && !jobLocation.includes('remote')) {
+        score += 10;
+        reasons.push(`On-site position as preferred`);
+      } else if (workPref === 'flexible') {
+        score += 5; // Small boost for flexible users
+      }
+      
+      // Specific location matching
+      for (const prefLocation of allLocations) {
         if (jobLocation.includes(prefLocation)) {
-          score += 10;
-          reasons.push(`Located in your preferred area`);
-        } else if (prefLocation.includes('remote') && jobLocation.includes('remote')) {
-          score += 15;
-          reasons.push(`Remote work as preferred`);
+          score += 12;
+          reasons.push(`Located in ${prefLocation}`);
+          break;
         }
       }
       
