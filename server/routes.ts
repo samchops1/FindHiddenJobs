@@ -469,9 +469,33 @@ Disallow: /*.css$`);
       // Use the resume parser to analyze the uploaded file
       const analysis = await resumeParser.parseResume(filePath, fileName);
       
-      // TODO: Fix database foreign key constraints for user creation
-      // For now, just return success without saving to database
-      console.log(`✅ Resume uploaded successfully: ${fileName} for user ${userId}`);
+      // Update user preferences with job titles from resume
+      try {
+        const existingPrefs = await storage.getUserPreferences(userId);
+        await storage.saveUserPreferences({
+          userId,
+          jobTypes: analysis.suggestedJobTitles || existingPrefs?.jobTypes || ['Software Engineer'],
+          preferredLocation: existingPrefs?.preferredLocation || 'Remote',
+          emailNotifications: existingPrefs?.emailNotifications ?? true
+        });
+        console.log(`✅ Updated user preferences with resume job titles: ${analysis.suggestedJobTitles?.join(', ')}`);
+      } catch (prefError) {
+        console.log(`ℹ️ Error updating user preferences:`, prefError);
+      }
+
+      // Now save the resume analysis
+      try {
+        await storage.saveResumeAnalysis({
+          userId,
+          fileName,
+          fileUrl: filePath,
+          analysis
+        });
+        console.log(`✅ Resume analysis saved for user ${userId}`);
+      } catch (resumeError) {
+        console.error(`❌ Failed to save resume analysis:`, resumeError);
+        // Continue anyway - analysis still worked
+      }
 
       // Clean up uploaded file after analysis
       try {
