@@ -4,11 +4,10 @@ import { JobSearchForm } from "@/components/job-search-form";
 import { JobCard } from "@/components/job-card";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { searchJobs, type SearchResponse } from "@/lib/job-api";
-import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Job, SearchRequest } from "@shared/schema";
-import logoImage from "@assets/Gemini_Generated_Image_cphjl0cphjl0cphj (1)_1755758641265.png";
 
 export default function Home() {
   const [searchParams, setSearchParams] = useState<SearchRequest | null>(null);
@@ -52,13 +51,21 @@ export default function Home() {
       <header className="bg-white border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center">
-              <img 
-                src={logoImage} 
-                alt="FindHiddenJobs.com" 
-                className="h-24 w-auto" 
-                data-testid="main-logo"
-              />
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
+                  <Briefcase className="w-6 h-6 text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-baseline space-x-1">
+                  <span className="text-2xl font-bold text-blue-600">find</span>
+                  <span className="text-2xl font-bold text-gray-600">hidden</span>
+                  <span className="text-2xl font-bold text-green-600">jobs</span>
+                </div>
+                <span className="text-sm text-gray-500 font-medium">.com</span>
+              </div>
             </div>
             <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
               <div className="flex items-center space-x-1">
