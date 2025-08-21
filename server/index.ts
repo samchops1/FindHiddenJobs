@@ -64,8 +64,8 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || '5000', 10);
   
   const startServer = async () => {
-    // Add a small delay to allow any previous processes to clean up
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Add a longer delay to allow any previous processes to clean up
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     try {
       const serverInstance = server.listen({
@@ -89,8 +89,10 @@ app.use((req, res, next) => {
       serverInstance.on('error', (err: any) => {
         console.error('Server error:', err);
         if (err.code === 'EADDRINUSE') {
-          log(`Port ${port} is already in use. Exiting to allow restart...`);
-          process.exit(1);
+          log(`Port ${port} is already in use. Waiting 5 seconds and retrying...`);
+          setTimeout(async () => {
+            await startServer();
+          }, 5000);
         } else {
           throw err;
         }
