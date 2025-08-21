@@ -86,7 +86,7 @@ export default function Dashboard() {
   });
 
   // Fetch recommended jobs
-  const { data: recommendationsData, isLoading: recommendationsLoading } = useQuery({
+  const { data: recommendationsData, isLoading: recommendationsLoading, error: recommendationsError } = useQuery({
     queryKey: ['/api/user/recommendations', user?.id],
     queryFn: async () => {
       const response = await fetch('/api/user/recommendations', {
@@ -98,6 +98,8 @@ export default function Dashboard() {
       return response.json();
     },
     enabled: !!user,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   if (loading) {
@@ -132,6 +134,15 @@ export default function Dashboard() {
   const recommendedJobs = recommendationsData?.recommendations || [];
   const recommendationsMessage = recommendationsData?.message;
   const isFirstTimeUser = recommendationsData?.isFirstTime || false;
+
+  // Debug logging
+  console.log('Dashboard state:', {
+    recommendationsLoading,
+    hasRecommendationsData: !!recommendationsData,
+    recommendedJobsCount: recommendedJobs.length,
+    isFirstTimeUser,
+    recommendationsError
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -235,19 +246,29 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="recommendations" className="space-y-4">
-                {recommendationsLoading ? (
+                {recommendationsLoading && !recommendationsData ? (
                   <Card>
                     <CardContent className="p-12 text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
                       <h3 className="text-xl font-semibold mb-2">
-                        {isFirstTimeUser ? 'Checking Your Profile...' : 'Loading Your Recommendations...'}
+                        Checking Your Profile...
                       </h3>
                       <p className="text-muted-foreground">
-                        {isFirstTimeUser 
-                          ? 'Analyzing your profile to generate personalized recommendations...'
-                          : 'Loading your personalized job recommendations...'
-                        }
+                        Analyzing your profile to generate personalized recommendations...
                       </p>
+                    </CardContent>
+                  </Card>
+                ) : recommendationsError ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-xl font-semibold mb-2">Unable to Load Recommendations</h3>
+                      <p className="text-muted-foreground mb-4">
+                        We're having trouble loading your recommendations right now. Please try refreshing the page.
+                      </p>
+                      <Button onClick={() => window.location.reload()}>
+                        Refresh Page
+                      </Button>
                     </CardContent>
                   </Card>
                 ) : recommendedJobs.length === 0 ? (
