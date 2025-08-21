@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { recommendationScheduler } from "./scheduler";
+import { validateEnvironment } from "./env-validator";
+import { logger } from "./logger";
 
 const app = express();
 app.use(express.json());
@@ -38,6 +40,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Validate environment variables before starting
+  validateEnvironment();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

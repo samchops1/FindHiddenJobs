@@ -825,7 +825,8 @@ Disallow: /*.css$`);
   // Test endpoint to send digest email to sameer.s.chopra@gmail.com
   app.post('/api/test/send-digest-to-sameer', async (req, res) => {
     try {
-      console.log('🧪 Sending test digest email to sameer.s.chopra@gmail.com...');
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@findhiddenjobs.com';
+      console.log(`🧪 Sending test digest email to ${adminEmail}...`);
       
       // Create mock job recommendations for testing (without database dependencies)
       const mockRecommendations = [
@@ -857,14 +858,14 @@ Disallow: /*.css$`);
       
       // Send test digest with mock recommendations
       await resendEmailService.sendDailyRecommendations(
-        'sameer.s.chopra@gmail.com',
+        adminEmail,
         'Sameer',
         mockRecommendations,
         ['Software Engineer', 'Senior Developer', 'Product Manager']
       );
       
       res.json({ 
-        message: 'Test digest email sent successfully to sameer.s.chopra@gmail.com',
+        message: `Test digest email sent successfully to ${adminEmail}`,
         recommendationsCount: mockRecommendations.length
       });
       
@@ -890,7 +891,7 @@ Disallow: /*.css$`);
       // Send feature request email to your address
       const featureRequestEmail = {
         from: process.env.EMAIL_FROM || 'noreply@findhiddenjobs.com',
-        to: 'sameer.s.chopra@gmail.com',
+        to: process.env.ADMIN_EMAIL || 'admin@findhiddenjobs.com',
         subject: `Feature Request: ${title}`,
         html: `
           <!DOCTYPE html>
@@ -1486,22 +1487,37 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
       }
     }
     
-    // Add longer timeout for JavaScript-heavy sites like ADP
-    const isADP = link.includes('workforcenow.adp.com') || link.includes('myjobs.adp.com');
+    // Smart timeout handling - longer for known problematic sites
+    const isProblematicSite = link.includes('workforcenow.adp.com') || 
+                              link.includes('myjobs.adp.com') ||
+                              link.includes('ashbyhq.com') ||
+                              link.includes('workable.com');
     const controller = new AbortController();
-    const timeoutMs = isADP ? 10000 : 5000; // 10 seconds for ADP, 5 for others
+    const timeoutMs = isProblematicSite ? 15000 : 8000; // 15s for problematic sites, 8s for others
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
+    // Randomize user agents to avoid detection
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15'
+    ];
+    const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+
     const response = await fetch(link, {
       headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'User-Agent': randomUA,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
         'DNT': '1',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none'
       },
       redirect: 'follow',
       signal: controller.signal
@@ -2570,9 +2586,10 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
           }
         });
         
-        // Small delay between batches to be respectful
+        // Random delay between batches to avoid detection
         if (i + BATCH_SIZE < Math.min(urlsToScrape.length, 20)) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          const delay = 500 + Math.random() * 1000; // 0.5-1.5 second random delay
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
