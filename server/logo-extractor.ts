@@ -20,7 +20,16 @@ export function extractCompanyLogo(
   platform: string
 ): LogoExtractionResult {
   
-  // Try to extract from ATS page first (most accurate)
+  // Try Clearbit API first (most reliable and consistent)
+  if (company) {
+    const clearbitLogo = getClearbitLogo(company);
+    if (clearbitLogo) {
+      console.log(`✅ Using Clearbit logo for ${company}: ${clearbitLogo}`);
+      return { logo: clearbitLogo, source: 'clearbit' };
+    }
+  }
+  
+  // Try to extract from ATS page as fallback
   const atsLogo = extractLogoFromATS($, platform, url);
   if (atsLogo) {
     return { logo: atsLogo, source: 'ats-page' };
@@ -32,18 +41,10 @@ export function extractCompanyLogo(
     return { logo: metaLogo, source: 'meta' };
   }
   
-  // Try favicon as fallback
+  // Try favicon as final fallback
   const favicon = extractFavicon($, url);
   if (favicon) {
     return { logo: favicon, source: 'favicon' };
-  }
-  
-  // Use Clearbit as final fallback
-  if (company) {
-    const clearbitLogo = getClearbitLogo(company);
-    if (clearbitLogo) {
-      return { logo: clearbitLogo, source: 'clearbit' };
-    }
   }
   
   return { logo: null, source: 'clearbit' };
@@ -221,20 +222,38 @@ function extractFavicon($: cheerio.CheerioAPI, pageUrl: string): string | null {
 }
 
 /**
- * Get Clearbit logo (existing approach) with fallback domain logic
+ * Get Clearbit logo with multiple domain strategies
  */
 function getClearbitLogo(company: string): string | null {
+  if (!company || company.length < 2) {
+    return null;
+  }
+
   // Clean company name for domain extraction
   const cleanCompany = company
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\b(inc|llc|corp|corporation|ltd|limited|co|company|the|and)\b/g, '')
+    .replace(/\b(inc|llc|corp|corporation|ltd|limited|co|company|the|and|technologies|tech|solutions|group|systems|software|services)\b/g, '')
     .trim()
     .replace(/\s+/g, '');
     
   if (cleanCompany && cleanCompany.length > 1) {
-    // Try company.com first
-    return `https://logo.clearbit.com/${cleanCompany}.com`;
+    console.log(`🔍 Generating Clearbit logo for cleaned company: "${cleanCompany}" from original: "${company}"`);
+    
+    // Multiple domain strategies - Clearbit will try to find the best match
+    const domains = [
+      `${cleanCompany}.com`,
+      `${cleanCompany}.io`,
+      `${cleanCompany}.co`,
+      `${cleanCompany}.net`,
+      `${cleanCompany}.org`
+    ];
+    
+    // Start with .com as most common
+    const primaryDomain = domains[0];
+    console.log(`🌐 Using primary Clearbit domain: ${primaryDomain}`);
+    
+    return `https://logo.clearbit.com/${primaryDomain}`;
   }
   
   return null;

@@ -1303,7 +1303,7 @@ function buildSearchQuery(query: string, site: string, location: string = "all",
   return searchQuery;
 }
 
-async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, timeFilter?: string): Promise<(InsertJob | string)[]> {
+async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, timeFilter?: string): Promise<{ results: (InsertJob | string)[]; searchResultDataMap: Map<string, { title: string; snippet: string; url: string }> }> {
   const API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
   const SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
   
@@ -1336,10 +1336,13 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
       
       // Process cached data same as fresh data
       if (!data.items) {
-        return [];
+        return { results: [], searchResultDataMap: new Map() };
       }
       
-      // [Rest of processing logic will be here]
+      // For cached results, we don't have the search data map, so return empty map
+      const cachedResults: (InsertJob | string)[] = [];
+      // Add basic processing for cached data if needed
+      return { results: cachedResults, searchResultDataMap: new Map() };
     } else {
       console.log(`🌐 Making fresh API call: ${url}`);
       console.log(`🔗 Encoded query: ${encodeURIComponent(searchQuery)}`);
@@ -1379,6 +1382,9 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
     
     // Separate URLs for traditional scraping
     const urlsForScraping: string[] = [];
+    
+    // Store original search result data for fallback (Ashby/Workable)
+    const searchResultDataMap = new Map<string, { title: string; snippet: string; url: string }>();
 
     data.items.forEach((item) => {
       const link = item.link;
@@ -1446,7 +1452,18 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
         }
       }
       
-      // Check other job platforms - matching Brian's approach
+      // Check other job platforms - store search data for Ashby/Workable fallback
+      const isAshbyOrWorkable = link.includes('jobs.ashbyhq.com') || link.includes('jobs.workable.com');
+      if (isAshbyOrWorkable) {
+        // Store original search result data for fallback
+        searchResultDataMap.set(link, {
+          title: item.title || '',
+          snippet: item.snippet || '',
+          url: link
+        });
+        console.log(`🔄 Stored search data for ${link.includes('ashbyhq') ? 'Ashby' : 'Workable'}: ${link}`);
+      }
+      
       const isOtherJobPlatform = (
         (link.includes('jobs.lever.co') && link.includes('/posting/')) || 
         link.includes('jobs.ashbyhq.com') ||
@@ -1540,11 +1557,52 @@ async function searchWithGoogleAPI(searchQuery: string, startIndex: number = 1, 
       });
     }
     
-    return results;
+    // Return both results and search data map for fallback processing
+    return { results, searchResultDataMap };
     
   } catch (error) {
     console.error('❌ Google Search API network error:', error);
-    return [];
+    return { results: [], searchResultDataMap: new Map() };
+  }
+}
+
+// Helper function to create jobs from Google search data when scraping fails
+function createJobFromSearchData(
+  searchData: { title: string; snippet: string; url: string },
+  url: string
+): InsertJob | null {
+  try {
+    // Extract job title from Google search result
+    const extractedJobTitle = extractJobTitleFromSearchResult(searchData.title, searchData.snippet, url);
+    
+    if (!extractedJobTitle) {
+      console.log(`❌ Could not extract job title from search data for: ${url}`);
+      return null;
+    }
+    
+    // Extract platform from URL
+    const platform = getPlatformFromUrl(url);
+    
+    // Create job object from search result data
+    const fallbackJob: InsertJob = {
+      title: extractedJobTitle.jobTitle,
+      company: extractedJobTitle.company,
+      location: extractLocationFromText(searchData.snippet || searchData.title) || 'Location not specified',
+      description: null, // No description from search results
+      url: url,
+      logo: (() => {
+        const logoResult = extractCompanyLogo(cheerio.load(''), extractedJobTitle.company, url, platform);
+        return logoResult.logo;
+      })(),
+      platform: platform,
+      tags: extractTags(extractedJobTitle.jobTitle, searchData.snippet),
+      postedAt: extractPostingDateFromText(searchData.snippet || searchData.title)
+    };
+    
+    return fallbackJob;
+  } catch (error) {
+    console.error('❌ Error creating job from search data:', error);
+    return null;
   }
 }
 
@@ -2794,7 +2852,7 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
     
     for (let page = 1; page <= maxPages; page++) {
       const startIndex = (page - 1) * 10 + 1;
-      const pageResults = await searchWithGoogleAPI(searchQuery, startIndex, timeFilter);
+      const { results: pageResults, searchResultDataMap: pageSearchData } = await searchWithGoogleAPI(searchQuery, startIndex, timeFilter);
       
       if (pageResults.length === 0) {
         console.log(`No more results found on page ${page}, stopping...`);
@@ -2802,6 +2860,11 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
       }
       
       allResults.push(...pageResults);
+      
+      // Merge search data maps
+      pageSearchData.forEach((data, url) => {
+        searchDataMap.set(url, data);
+      });
       
       // Check if we've hit the maxResults limit
       if (maxResults && allResults.length >= maxResults) {
@@ -2814,6 +2877,9 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
+    
+    // Initialize search data map for fallback processing
+    const searchDataMap = new Map<string, { title: string; snippet: string; url: string }>();
     
     // Separate job objects from URLs that need scraping
     const jobsFromSearchResults = allResults.filter((item): item is InsertJob => typeof item === 'object');
@@ -2835,13 +2901,30 @@ async function scrapeJobsFromPlatform(query: string, site: string, location: str
         
         const batchResults = await Promise.allSettled(batchPromises);
         batchResults.forEach((result, index) => {
+          const url = batch[index];
           if (result.status === 'fulfilled' && result.value) {
             jobs.push(result.value);
-            console.log(`✅ Successfully scraped job from: ${batch[index]}`);
-          } else if (result.status === 'rejected') {
-            console.log(`❌ Failed to scrape ${batch[index]}: ${result.reason}`);
+            console.log(`✅ Successfully scraped job from: ${url}`);
           } else {
-            console.log(`⚠️ Scraping returned null for: ${batch[index]}`);
+            // Check if this is an Ashby/Workable URL - create fallback job from search data
+            const isAshbyOrWorkable = url.includes('jobs.ashbyhq.com') || url.includes('jobs.workable.com');
+            const searchData = searchDataMap.get(url);
+            
+            if (isAshbyOrWorkable && searchData) {
+              const fallbackJob = createJobFromSearchData(searchData, url);
+              if (fallbackJob) {
+                jobs.push(fallbackJob);
+                console.log(`✨ Created fallback job from search data for ${url.includes('ashbyhq') ? 'Ashby' : 'Workable'}: "${fallbackJob.title}" at ${fallbackJob.company}`);
+              } else {
+                console.log(`⚠️ Failed to create fallback job from search data for: ${url}`);
+              }
+            } else {
+              if (result.status === 'rejected') {
+                console.log(`❌ Failed to scrape ${url}: ${result.reason}`);
+              } else {
+                console.log(`⚠️ Scraping returned null for: ${url}`);
+              }
+            }
           }
         });
         
