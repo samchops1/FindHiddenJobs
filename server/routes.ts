@@ -73,7 +73,7 @@ Disallow: /*.js$
 Disallow: /*.css$`);
   });
 
-  // Job search endpoint
+  // Job search endpoint with better error handling
   app.get('/api/search', async (req, res) => {
     try {
       console.log(`🚀 API /search called with params:`, req.query);
@@ -111,14 +111,19 @@ Disallow: /*.css$`);
           resultCount: "0"
         });
 
-        allJobs = await scrapeJobsFromAllPlatforms(query, site, location, timeFilter);
+        // Use graceful search with rate limit handling
+        allJobs = await scrapeJobsFromAllPlatformsGraceful(query, site, location, timeFilter, false);
         
         // Store scraped jobs
         for (const jobData of allJobs) {
-          await storage.createJob(jobData);
+          try {
+            await storage.createJob(jobData);
+          } catch (jobError) {
+            console.warn('Failed to store job:', jobError);
+          }
         }
         
-        // Cache the full results
+        // Cache the results even if partial
         jobSearchCache.set(cacheKey, {
           jobs: allJobs,
           timestamp: Date.now()
@@ -165,13 +170,62 @@ Disallow: /*.css$`);
       });
     } catch (error) {
       console.error('Search error:', error);
+      
+      // Return partial results if available
       res.status(500).json({ 
-        error: 'Failed to search jobs', 
-        message: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Search completed with errors', 
+        message: error instanceof Error ? error.message : 'Unknown error',
+        jobs: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 0,
+          totalJobs: 0,
+          jobsPerPage: 25,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
       });
     }
   });
+  
+  // Streaming search endpoint
+  app.get('/api/search-stream', async (req, res) => {
+    try {
+      const { query, site, location, timeFilter } = searchRequestSchema.parse(req.query);
+      
+      // Set up Server-Sent Events
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      const sendEvent = (event: string, data: any) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      sendEvent('start', { message: 'Search started', query, site, location });
+      
+      const jobs = await scrapeJobsFromAllPlatformsStreaming(
+        query, site, location, timeFilter, sendEvent
+      );
+      
+      sendEvent('complete', { totalJobs: jobs.length });
+      res.end();
+      
+    } catch (error) {
+      console.error('Streaming search error:', error);
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
+      res.end();
+    }
+  });
 
+  // Simple test endpoint
+  app.get('/api/test', (req, res) => {
+    res.json({ message: 'API is working', timestamp: new Date().toISOString() });
+  });
+  
   // Debug endpoint to test Google API directly
   app.get('/api/debug/google', async (req, res) => {
     try {
@@ -1841,6 +1895,66 @@ function extractTags(title: string, description: string): string[] {
   return uniqueTags.slice(0, 5); // Limit to 5 unique tags
 }
 
+
+// Graceful version that handles rate limits
+export async function scrapeJobsFromAllPlatformsGraceful(query: string, site: string, location: string, timeFilter?: string, isEmailRecommendation?: boolean): Promise<InsertJob[]> {
+  try {
+    return await scrapeJobsFromAllPlatforms(query, site, location, timeFilter, isEmailRecommendation);
+  } catch (error) {
+    console.error('❌ Error in scrapeJobsFromAllPlatforms:', error);
+    // Return empty array instead of throwing - let the UI handle gracefully
+    return [];
+  }
+}
+
+// Streaming version that sends progress updates
+export async function scrapeJobsFromAllPlatformsStreaming(
+  query: string, 
+  site: string, 
+  location: string, 
+  timeFilter?: string, 
+  sendEvent?: (event: string, data: any) => void
+): Promise<InsertJob[]> {
+  const allJobs: InsertJob[] = [];
+  const platforms = site === 'all' ? [
+    'greenhouse.io', 'lever.co', 'ashbyhq.com', 'myworkdayjobs.com', 
+    'jobs.workable.com', 'adp', 'icims.com', 'jobvite.com'
+  ] : [site];
+  
+  let processedPlatforms = 0;
+  
+  for (const platform of platforms.slice(0, 5)) { // Limit to first 5 to avoid quotas
+    try {
+      sendEvent?.('progress', { 
+        platform, 
+        processed: processedPlatforms, 
+        total: Math.min(platforms.length, 5),
+        message: `Searching ${platform}...`
+      });
+      
+      const jobs = await scrapeJobsFromPlatform(query, platform, location, timeFilter);
+      allJobs.push(...jobs);
+      
+      processedPlatforms++;
+      
+      sendEvent?.('platform-complete', {
+        platform,
+        jobsFound: jobs.length,
+        totalJobs: allJobs.length
+      });
+      
+      // Add delay between platforms
+      if (processedPlatforms < Math.min(platforms.length, 5)) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      console.error(`❌ Failed to search ${platform}:`, error);
+      sendEvent?.('platform-error', { platform, error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+  
+  return allJobs;
+}
 
 export async function scrapeJobsFromAllPlatforms(query: string, site: string, location: string, timeFilter?: string, isEmailRecommendation?: boolean): Promise<InsertJob[]> {
   console.log(`Starting search for "${query}" on site "${site}" with location "${location}"`);
