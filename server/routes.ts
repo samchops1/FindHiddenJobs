@@ -2165,11 +2165,6 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
     // Extract posting date from description
     postedAt = extractPostingDateFromText(fullText);
 
-    // Sanitize all fields before validation and return
-    title = sanitizeJobField(title, 'title', 200);
-    company = sanitizeJobField(company, 'company', 100);
-    location = sanitizeJobField(location || 'Location not specified', 'location', 200);
-    
     // Only return job if we have BOTH title AND company - strict validation
     if (title && company && title.length > 3 && company.length > 1) {
       console.log(`✅ Successfully extracted job: "${title}" at ${company}`);
@@ -2180,8 +2175,8 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
       return {
         title,
         company,
-        location,
-        description: description ? sanitizeJobField(description, 'description', 1000) : null,
+        location: location || 'Not specified',
+        description: description ? description.substring(0, 1000) : null,
         url: link, // Keep original URL for apply button
         logo: logoResult.logo,
         platform,
@@ -2199,127 +2194,24 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
   }
 }
 
-function sanitizeJobField(value: string, fieldName: string, maxLength: number = 500): string {
-  if (!value) return '';
-  
-  // Remove HTML tags and excessive whitespace
-  let cleaned = value
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  // If the field is excessively long, it's likely corrupted data
-  if (cleaned.length > maxLength) {
-    console.log(`⚠️ Field ${fieldName} too long (${cleaned.length} chars), truncating`);
-    cleaned = cleaned.substring(0, maxLength).trim();
-  }
-  
-  // If it contains excessive JSON-like content or prefetch data, it's corrupted
-  if (cleaned.includes('{"prefetch"') || cleaned.includes('\\') || 
-      cleaned.match(/\{[^}]{100,}\}/) || cleaned.includes('javascript:') ||
-      cleaned.includes('function(') || cleaned.includes('var ')) {
-    console.log(`⚠️ Field ${fieldName} contains corrupted data, cleaning`);
-    
-    // For location, try to extract just city/state pattern
-    if (fieldName === 'location') {
-      const locationMatch = cleaned.match(/([A-Za-z\s]+,\s*[A-Z]{2,})/);
-      if (locationMatch) {
-        return locationMatch[1].trim();
-      }
-      return 'Location not specified';
-    }
-    
-    // For title, try to extract meaningful job title
-    if (fieldName === 'title') {
-      const titleWords = cleaned.split(' ').filter(word => 
-        word.length > 2 && 
-        !word.includes('{') && 
-        !word.includes('}') &&
-        !word.includes('=') &&
-        /^[A-Za-z0-9\s\-&]+$/.test(word)
-      );
-      if (titleWords.length > 0) {
-        return titleWords.slice(0, 10).join(' ').trim();
-      }
-    }
-    
-    // For company, return generic fallback
-    if (fieldName === 'company') {
-      return 'Company Not Available';
-    }
-    
-    return '';
-  }
-  
-  return cleaned;
-}
-
 function extractADPJobFromUrl(url: string, searchQuery?: string): InsertJob | null {
   try {
-    console.log(`🔍 Attempting to extract ADP job from URL: ${url}`);
-    
     // Try to extract job information from ADP URL parameters
     const urlObj = new URL(url);
     const jobId = urlObj.searchParams.get('jobId');
-    const cid = urlObj.searchParams.get('cid');
     
-    // Extract potential company name from the path or domain
-    let company = 'ADP Client';
-    let title = searchQuery || 'Position Available';
-    let location = 'Location not specified';
-    
-    // Try to get more specific info from URL path
-    if (url.includes('myjobs.adp.com')) {
-      // Extract company from myjobs.adp.com subdomain or path
-      const pathParts = urlObj.pathname.split('/');
-      if (pathParts.length > 1 && pathParts[1] !== 'cx' && pathParts[1] !== 'apply') {
-        company = pathParts[1].replace(/[-_]/g, ' ')
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      }
-    }
-    
-    // Extract additional info from URL parameters
-    const lang = urlObj.searchParams.get('lang');
-    const source = urlObj.searchParams.get('source');
-    const utm_source = urlObj.searchParams.get('utm_source');
-    
-    // Try to extract location from UTM parameters or other clues
-    if (utm_source && utm_source.includes('remote')) {
-      location = 'Remote';
-    }
-    
-    // If we have a jobId, this is likely a real job posting
-    if (jobId) {
-      console.log(`✅ Found ADP job with ID: ${jobId}, company: ${company}`);
+    if (jobId && searchQuery) {
+      console.log(`🔍 Extracting ADP job from URL params: jobId=${jobId}`);
       
       return {
-        title: title,
-        company: company,
-        location: location,
-        description: `${title} position at ${company}. Job ID: ${jobId}. Apply directly through the company's ADP career portal to view full details and requirements.`,
+        title: searchQuery,
+        company: 'ADP Client',
+        location: 'Location not specified',
+        description: `Position for ${searchQuery}. Full details available on the company's ADP career portal.`,
         url: url,
-        logo: 'https://workforcenow.adp.com/favicon.ico', 
+        logo: null,
         platform: 'ADP',
-        tags: extractTags(title, ''),
-        postedAt: null
-      };
-    }
-    
-    // No jobId found, but URL looks like a job listing
-    if (url.includes('recruitment') || url.includes('job-listing') || url.includes('job-details')) {
-      console.log(`⚠️ ADP URL looks like a job but no jobId found: ${url}`);
-      
-      return {
-        title: title,
-        company: company,
-        location: location,
-        description: `${title} position at ${company}. Apply directly through the company's ADP career portal to view full details.`,
-        url: url,
-        logo: 'https://workforcenow.adp.com/favicon.ico',
-        platform: 'ADP',
-        tags: extractTags(title, ''),
+        tags: extractTags(searchQuery, ''),
         postedAt: null
       };
     }
