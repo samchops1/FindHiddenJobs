@@ -56,8 +56,8 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-            <div className="md:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-4">
+            <div className="lg:col-span-4">
               <FormField
                 control={form.control}
                 name="query"
@@ -83,7 +83,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="lg:col-span-2">
               <FormField
                 control={form.control}
                 name="site"
@@ -97,7 +97,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Building className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors w-full"
                             data-testid="select-platform"
                           >
                             <SelectValue />
@@ -171,7 +171,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="lg:col-span-2">
               <FormField
                 control={form.control}
                 name="location"
@@ -185,7 +185,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors min-w-0"
                             data-testid="select-location"
                           >
                             <SelectValue />
@@ -206,7 +206,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-3">
+            <div className="lg:col-span-2">
               <FormField
                 control={form.control}
                 name="timeFilter"
@@ -220,7 +220,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
                         <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5 z-10" />
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger 
-                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors"
+                            className="pl-12 py-3 md:py-4 text-base md:text-lg border-border focus:ring-2 focus:ring-primary bg-card hover:bg-muted/50 transition-colors min-w-0"
                             data-testid="select-time-filter"
                           >
                             <SelectValue />
@@ -246,7 +246,7 @@ export function JobSearchForm({ onSearch }: JobSearchFormProps) {
               />
             </div>
 
-            <div className="md:col-span-2 flex items-end">
+            <div className="lg:col-span-2 flex items-end">
               <Button
                 type="submit"
                 disabled={isSubmitting}

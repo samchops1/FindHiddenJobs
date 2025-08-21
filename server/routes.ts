@@ -748,6 +748,28 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
     let title, company, location, description;
     let platform = 'Unknown';
     let postedAt: Date | null = null;
+    
+    // Try to extract company first from structured data and meta tags
+    let metaCompany = $('meta[property="og:site_name"]').attr('content') ||
+                      $('meta[name="application-name"]').attr('content') ||
+                      '';
+    
+    // Try to parse JSON-LD structured data for company info
+    try {
+      const ldJsonScript = $('script[type="application/ld+json"]').text();
+      if (ldJsonScript) {
+        const ldData = JSON.parse(ldJsonScript);
+        if (ldData.hiringOrganization?.name) {
+          metaCompany = ldData.hiringOrganization.name;
+        } else if (ldData.organizationName) {
+          metaCompany = ldData.organizationName;
+        } else if (ldData.publisher?.name) {
+          metaCompany = ldData.publisher.name;
+        }
+      }
+    } catch (e) {
+      // JSON parsing failed, continue
+    }
 
     // Smart scraper logic for different ATS platforms
     if (link.includes('boards.greenhouse.io')) {
@@ -765,17 +787,22 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
       company = $('.company-name').text().trim().replace(/^at\s+/i, '') ||
                 $('[data-automation="jobPostingCompany"]').text().trim() ||
                 $('.organization-name').text().trim() ||
-                $('meta[property="og:site_name"]').attr('content') ||
+                metaCompany ||
                 '';
       
       // Extract company from URL if not found in content
       if (!company && link) {
         const urlMatch = link.match(/boards\.greenhouse\.io\/([^/]+)/);
         if (urlMatch) {
-          company = urlMatch[1].replace(/[-_]/g, ' ')
+          const extracted = urlMatch[1].replace(/[-_]/g, ' ')
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
+          
+          // Only use if it's a real company name
+          if (isLikelyCompanyName(extracted)) {
+            company = extracted;
+          }
         }
       }
       
@@ -867,10 +894,15 @@ async function scrapeJobDetails(link: string, searchQuery?: string): Promise<Ins
       if (!company && link) {
         const leverMatch = link.match(/jobs\.lever\.co\/([^/]+)/);
         if (leverMatch) {
-          company = leverMatch[1].replace(/[-_]/g, ' ')
+          const extracted = leverMatch[1].replace(/[-_]/g, ' ')
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
+          
+          // Only use if it's a real company name
+          if (isLikelyCompanyName(extracted)) {
+            company = extracted;
+          }
         }
       }
       
@@ -1279,52 +1311,42 @@ function getPlatformFromUrl(url: string): string {
 function extractJobTitleFromSearchResult(title: string, snippet: string, url: string): { jobTitle: string; company: string } | null {
   if (!title) return null;
   
-  // Clean up the title - remove common suffixes
-  let cleanTitle = title
+  // Extract company FIRST with comprehensive matching
+  let company = extractCompanyFromMultipleSources(title, snippet, url);
+  
+  // Clean up the title - remove company names and common suffixes
+  let cleanTitle = title;
+  
+  // Remove company name from title if we found it
+  if (company && company !== 'Company') {
+    // Create pattern to match company name (case insensitive, handle spaces/punctuation)
+    const companyPattern = new RegExp(`\\s*[-|–]?\\s*${company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
+    cleanTitle = cleanTitle.replace(companyPattern, '');
+    
+    // Also try removing "at Company" pattern
+    const atCompanyPattern = new RegExp(`\\s*at\\s+${company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
+    cleanTitle = cleanTitle.replace(atCompanyPattern, '');
+  }
+  
+  // Clean up the title further
+  cleanTitle = cleanTitle
     .replace(/\s*\|\s*.+$/, '') // Remove "| Company Name"
-    .replace(/\s*-\s*.+$/, '')  // Remove "- Company Name"
+    .replace(/\s*-\s*.+$/, '')  // Remove "- Company Name"  
     .replace(/\s*–\s*.+$/, '')  // Remove "– Company Name"
     .replace(/\s*at\s+.+$/i, '') // Remove "at Company"
     .replace(/\s*\(.+\)$/, '')   // Remove "(Location)"
+    .replace(/\s*job\s*$/i, '')  // Remove trailing "job"
+    .replace(/\s*position\s*$/i, '') // Remove trailing "position"
+    .replace(/\s*opening\s*$/i, '') // Remove trailing "opening"
     .trim();
   
-  // Extract company from various sources
-  let company = '';
-  
-  // Try to extract from title suffix
-  const titleMatch = title.match(/\|\s*(.+)$/) || title.match(/-\s*(.+)$/) || title.match(/–\s*(.+)$/);
-  if (titleMatch) {
-    company = titleMatch[1].trim();
-  }
-  
-  // Try to extract from URL for known patterns
-  if (!company) {
-    if (url.includes('boards.greenhouse.io/')) {
-      const match = url.match(/boards\.greenhouse\.io\/([^/]+)/);
-      if (match) {
-        company = match[1].replace(/[-_]/g, ' ')
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      }
-    } else if (url.includes('jobs.lever.co/')) {
-      const match = url.match(/jobs\.lever\.co\/([^/]+)/);
-      if (match) {
-        company = match[1].replace(/[-_]/g, ' ')
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      }
-    }
-  }
-  
   // Basic validation - reject generic titles, but check snippet for actual job content
-  const invalidTitles = ['careers', 'jobs', 'opportunities', 'openings', 'apply', 'home', 'about'];
+  const invalidTitles = ['careers', 'jobs', 'opportunities', 'openings', 'apply', 'home', 'about', 'hiring'];
   const hasInvalidTitle = invalidTitles.some(invalid => cleanTitle.toLowerCase().includes(invalid) && cleanTitle.length < 30);
   
   // If title seems generic, try to extract from snippet instead
   if (hasInvalidTitle && snippet) {
-    const snippetJobMatch = snippet.match(/(?:director|manager|engineer|analyst|specialist|lead|senior|principal|staff)\s+(?:of\s+)?(?:technology|engineering|product|data|marketing|sales)/i);
+    const snippetJobMatch = snippet.match(/(?:director|manager|engineer|analyst|specialist|lead|senior|principal|staff|developer|designer|scientist|architect|consultant)\s+(?:of\s+)?(?:technology|engineering|product|data|marketing|sales|operations|design|security|software|web|mobile|ai|ml)/i);
     if (snippetJobMatch) {
       cleanTitle = snippetJobMatch[0];
       console.log(`🔄 Extracted job title from snippet: "${cleanTitle}" for ${url}`);
@@ -1342,6 +1364,142 @@ function extractJobTitleFromSearchResult(title: string, snippet: string, url: st
     jobTitle: cleanTitle,
     company: company || 'Company'
   };
+}
+
+function extractCompanyFromMultipleSources(title: string, snippet: string, url: string): string {
+  let company = '';
+  
+  // Method 1: Extract from title with various separators
+  const titleSeparators = [
+    /\|\s*(.+)$/,           // "Job Title | Company"
+    /-\s*(.+)$/,            // "Job Title - Company"  
+    /–\s*(.+)$/,            // "Job Title – Company"
+    /\sat\s+(.+)$/i,        // "Job Title at Company"
+    /\swith\s+(.+)$/i,      // "Job Title with Company"
+    /\s@\s*(.+)$/,          // "Job Title @ Company"
+    /:\s*(.+)$/,            // "Job Title: Company"
+  ];
+  
+  for (const separator of titleSeparators) {
+    const match = title.match(separator);
+    if (match && match[1]) {
+      const extracted = match[1].trim();
+      // Validate it's likely a company name (not location, etc.)
+      if (isLikelyCompanyName(extracted)) {
+        company = cleanCompanyName(extracted);
+        console.log(`📝 Extracted company from title separator: "${company}"`);
+        break;
+      }
+    }
+  }
+  
+  // Method 2: Extract from URL patterns
+  if (!company) {
+    const urlPatterns = [
+      { pattern: /boards\.greenhouse\.io\/([^/]+)/, platform: 'Greenhouse' },
+      { pattern: /jobs\.lever\.co\/([^/]+)/, platform: 'Lever' },
+      { pattern: /jobs\.ashbyhq\.com\/([^/]+)/, platform: 'Ashby' },
+      { pattern: /myworkdayjobs\.com\/([^/]+)/, platform: 'Workday' },
+      { pattern: /jobs\.workable\.com\/([^/]+)/, platform: 'Workable' },
+      { pattern: /myjobs\.adp\.com\/([^/]+)/, platform: 'ADP' },
+      { pattern: /careers\.([^.]+)\./, platform: 'Careers Page' },
+      { pattern: /([^.]+)\.careers\./, platform: 'Careers Subdomain' },
+      { pattern: /jobs\.([^.]+)\./, platform: 'Jobs Page' },
+      { pattern: /([^.]+)\.jobs\./, platform: 'Jobs Subdomain' },
+    ];
+    
+    for (const { pattern, platform } of urlPatterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        let extracted = match[1];
+        
+        // Clean up common URL artifacts
+        extracted = extracted
+          .replace(/careers?$/, '')
+          .replace(/jobs?$/, '')
+          .replace(/[-_]/g, ' ')
+          .trim();
+        
+        if (extracted && isLikelyCompanyName(extracted)) {
+          company = cleanCompanyName(extracted);
+          console.log(`🔗 Extracted company from ${platform} URL: "${company}"`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // Method 3: Extract from snippet patterns
+  if (!company && snippet) {
+    const snippetPatterns = [
+      /(?:work\s+at|join|hiring\s+at|career\s+at|opportunity\s+at)\s+([A-Z][a-zA-Z\s&.,-]+?)(?:\s|$|\.)/i,
+      /([A-Z][a-zA-Z\s&.,-]+?)\s+is\s+(?:hiring|looking|seeking)/i,
+      /Apply\s+to\s+([A-Z][a-zA-Z\s&.,-]+?)(?:\s|$|\.)/i,
+      /([A-Z][a-zA-Z\s&.,-]+?)\s+(?:job|position|role|opening)/i,
+    ];
+    
+    for (const pattern of snippetPatterns) {
+      const match = snippet.match(pattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        if (isLikelyCompanyName(extracted)) {
+          company = cleanCompanyName(extracted);
+          console.log(`📰 Extracted company from snippet: "${company}"`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // Method 4: Extract from domain if all else fails
+  if (!company) {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.replace('www.', '');
+      const parts = hostname.split('.');
+      
+      // Skip common subdomains and ATS platforms
+      const skipDomains = ['boards', 'jobs', 'careers', 'apply', 'greenhouse', 'lever', 'ashby', 'workday', 'workable', 'adp'];
+      const mainDomain = parts.find(part => !skipDomains.includes(part)) || parts[0];
+      
+      if (mainDomain && mainDomain.length > 2) {
+        company = cleanCompanyName(mainDomain);
+        console.log(`🌐 Extracted company from domain: "${company}"`);
+      }
+    } catch (e) {
+      // URL parsing failed, continue
+    }
+  }
+  
+  return company || 'Company';
+}
+
+function isLikelyCompanyName(text: string): boolean {
+  if (!text || text.length < 2) return false;
+  
+  // Exclude obvious non-company patterns
+  const excludePatterns = [
+    /^\d+$/,                    // Just numbers
+    /^(remote|onsite|hybrid)$/i, // Work types
+    /^(full.?time|part.?time|contract|freelance)$/i, // Employment types
+    /^(ca|ny|tx|fl|wa|ma|il|pa|oh|ga|nc|mi|nj|va|tn|in|az|mo|md|wi|mn|co|al|sc|la|ky|or|ok|ct|ia|ms|ar|ks|ut|nv|nm|ne|wv|id|hi|nh|me|ri|mt|de|sd|nd|ak|dc|vt|wy)$/i, // US states
+    /^(united states|usa|us|canada|uk|europe|asia)$/i, // Countries/regions
+    /^(new york|los angeles|chicago|houston|phoenix|philadelphia|san antonio|san diego|dallas|san jose|austin|jacksonville|fort worth|columbus|charlotte|san francisco|indianapolis|seattle|denver|washington|boston|el paso|detroit|nashville|portland|memphis|oklahoma city|las vegas|louisville|baltimore|milwaukee|albuquerque|tucson|fresno|sacramento|mesa|kansas city|atlanta|long beach|colorado springs|raleigh|miami|virginia beach|omaha|oakland|minneapolis|tulsa|cleveland|wichita|arlington)$/i, // Major cities
+    /^(apply|hiring|careers?|jobs?|opportunities|openings|positions)$/i, // Job-related terms
+    /^(am|pm|est|pst|cst|mst|utc|gmt)$/i, // Time zones
+    /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)$/i, // Months
+  ];
+  
+  return !excludePatterns.some(pattern => pattern.test(text.trim()));
+}
+
+function cleanCompanyName(company: string): string {
+  return company
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function extractTags(title: string, description: string): string[] {
