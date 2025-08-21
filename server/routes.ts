@@ -398,7 +398,20 @@ Disallow: /*.css$`);
       });
     } catch (error) {
       console.error('Error analyzing resume:', error);
-      res.status(500).json({ error: 'Failed to analyze resume' });
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to analyze resume';
+      if (error instanceof Error) {
+        if (error.message.includes('OpenAI')) {
+          errorMessage = 'OpenAI API not configured. Please add OPENAI_API_KEY to environment variables.';
+        } else if (error.message.includes('extract')) {
+          errorMessage = 'Could not read the uploaded file. Please ensure it is a valid PDF, DOC, or DOCX file.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 

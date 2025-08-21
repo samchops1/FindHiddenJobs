@@ -1,7 +1,6 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
-import pdfParse from 'pdf-parse';
 
 // Initialize OpenAI client with fallback check
 if (!process.env.OPENAI_API_KEY) {
@@ -66,8 +65,9 @@ export class ResumeParser {
     
     try {
       if (fileExtension === '.pdf') {
-        // Parse PDF
+        // Parse PDF using dynamic import
         const dataBuffer = fs.readFileSync(filePath);
+        const pdfParse = (await import('pdf-parse')).default;
         const pdfData = await pdfParse(dataBuffer);
         return pdfData.text;
       } else if (fileExtension === '.docx' || fileExtension === '.doc') {
