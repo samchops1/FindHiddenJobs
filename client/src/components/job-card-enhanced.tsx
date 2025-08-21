@@ -204,12 +204,13 @@ export function JobCardEnhanced({ job, onSave, onApply, isSaved = false }: JobCa
             {/* Company Logo */}
             <div className="relative mx-auto sm:mx-0">
               <img 
-                src={job.logo || 'https://via.placeholder.com/80x80?text=?'}
+                src={job.logo || `https://via.placeholder.com/80x80/6366f1/ffffff?text=${encodeURIComponent(job.company.charAt(0).toUpperCase())}`}
                 alt={`${job.company} logo`}
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl object-cover border border-border flex-shrink-0 bg-muted group-hover:scale-105 transition-transform duration-300"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://via.placeholder.com/80x80?text=?';
+                  console.log(`Logo failed to load for ${job.company}: ${job.logo}`);
+                  target.src = `https://via.placeholder.com/80x80/6366f1/ffffff?text=${encodeURIComponent(job.company.charAt(0).toUpperCase())}`;
                 }}
               />
             </div>
