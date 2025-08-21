@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ExternalLink, MapPin, Calendar, Users, Bookmark, Share } from "lucide-react";
+import { ExternalLink, MapPin, Calendar, Users, Bookmark, Share, Check, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Job } from "@shared/schema";
 
 interface JobCardProps {
@@ -9,8 +11,62 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+
   const handleApply = () => {
     window.open(job.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShare = async () => {
+    try {
+      // Copy the job URL to clipboard
+      await navigator.clipboard.writeText(job.url);
+      setCopied(true);
+      
+      // Show success toast
+      toast({
+        title: "Link copied!",
+        description: "Job application link has been copied to your clipboard.",
+        duration: 3000,
+      });
+      
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = job.url;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        toast({
+          title: "Link copied!",
+          description: "Job application link has been copied to your clipboard.",
+          duration: 3000,
+        });
+        setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      } catch (err) {
+        toast({
+          title: "Copy failed",
+          description: "Please copy the link manually from the address bar.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+      
+      document.body.removeChild(textArea);
+    }
   };
 
 
@@ -120,9 +176,24 @@ export function JobCard({ job }: JobCardProps) {
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Apply Now
                 </Button>
-                <Button variant="outline" size="sm" className="px-4 py-2 rounded-xl border-border hover:bg-muted w-full lg:w-auto">
-                  <Share className="w-4 h-4 mr-2" />
-                  Share
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="px-4 py-2 rounded-xl border-border hover:bg-muted w-full lg:w-auto transition-all duration-200"
+                  onClick={handleShare}
+                  data-testid={`button-share-${job.id}`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share className="w-4 h-4 mr-2" />
+                      Share
+                    </>
+                  )}
                 </Button>
               </div>
               

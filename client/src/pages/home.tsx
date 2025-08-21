@@ -51,7 +51,7 @@ export default function Home() {
       <header className="bg-white border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-3">
+            <a href="/" className="flex items-center space-x-3 hover:opacity-90 transition-opacity">
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-600 rounded-xl flex items-center justify-center shadow-lg">
                   <Briefcase className="w-6 h-6 text-white" />
@@ -66,7 +66,7 @@ export default function Home() {
                 </div>
                 <span className="text-sm text-muted-foreground font-medium">.com</span>
               </div>
-            </div>
+            </a>
             <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
               <div className="flex items-center space-x-1">
                 <Building className="w-4 h-4" />
@@ -288,13 +288,10 @@ export default function Home() {
           </div>
           
           <div className="border-t border-border pt-8 mt-12">
-            <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="text-center">
               <p className="text-sm text-muted-foreground">
                 &copy; 2024 FindHiddenJobs.com. All rights reserved.
               </p>
-              <div className="flex items-center space-x-3 mt-4 md:mt-0">
-                <span className="text-xs text-muted-foreground">Powered by modern web scraping</span>
-              </div>
             </div>
           </div>
         </div>

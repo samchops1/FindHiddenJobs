@@ -7,7 +7,7 @@ export default function Terms() {
       <header className="bg-white border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-3">
+            <a href="/" className="flex items-center space-x-3 hover:opacity-90 transition-opacity">
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
                   <Briefcase className="w-6 h-6 text-white" />
@@ -22,7 +22,7 @@ export default function Terms() {
                 </div>
                 <span className="text-sm text-gray-500 font-medium">.com</span>
               </div>
-            </div>
+            </a>
             <nav>
               <a href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                 ← Back to Search
