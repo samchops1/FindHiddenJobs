@@ -246,15 +246,15 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="recommendations" className="space-y-4">
-                {recommendationsLoading && !recommendationsData ? (
+                {recommendationsLoading && !recommendationsData && isFirstTimeUser ? (
                   <Card>
                     <CardContent className="p-12 text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
                       <h3 className="text-xl font-semibold mb-2">
-                        Checking Your Profile...
+                        Generating Your First Recommendations...
                       </h3>
                       <p className="text-muted-foreground">
-                        Analyzing your profile to generate personalized recommendations...
+                        Analyzing your profile to generate personalized recommendations. This usually takes a moment for new users.
                       </p>
                     </CardContent>
                   </Card>
@@ -276,12 +276,12 @@ export default function Dashboard() {
                     <CardContent className="p-12 text-center">
                       <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-xl font-semibold mb-2">
-                        {isFirstTimeUser ? 'Complete Your Profile' : 'Recommendations Coming Soon'}
+                        {isFirstTimeUser ? 'Welcome! Set Up Your Recommendations' : 'Recommendations Coming Soon'}
                       </h3>
                       <p className="text-muted-foreground mb-4">
                         {isFirstTimeUser 
-                          ? (recommendationsMessage || 'Complete your profile to get personalized recommendations! Upload a resume, set job preferences, or start applying to jobs.')
-                          : (recommendationsMessage || 'Your personalized recommendations will be populated daily at 9 PM EST. Check back after 9 PM for your curated job matches!')
+                          ? (recommendationsMessage || 'Your first set of personalized recommendations will be generated at 9 PM EST today! In the meantime, complete your profile by uploading a resume or start searching jobs.')
+                          : (recommendationsMessage || 'Your personalized recommendations will be refreshed daily at 9 PM EST. Check back after 9 PM for your updated job matches!')
                         }
                       </p>
                       <Button onClick={() => window.location.href = '/'}>
