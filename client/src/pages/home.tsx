@@ -362,7 +362,7 @@ export default function Home() {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-foreground mb-2">Search failed</h3>
                   <p className="text-muted-foreground mb-4">
-                    {error instanceof Error ? error.message : "An unexpected error occurred"}
+                    {error && typeof error === 'object' && 'message' in error ? error.message : "An unexpected error occurred"}
                   </p>
                   <button 
                     onClick={handleRetry}

@@ -265,7 +265,13 @@ Disallow: /*.css$`);
   // Streaming search endpoint
   app.get('/api/search-stream', async (req, res) => {
     try {
-      const { query, site, location, timeFilter } = searchRequestSchema.parse(req.query);
+      // Parse and coerce query parameters for GET endpoint 
+      const parsedQuery = {
+        ...req.query,
+        page: req.query.page ? Number(req.query.page) : 1,
+        limit: req.query.limit ? Number(req.query.limit) : 25
+      };
+      const { query, site, location, timeFilter } = searchRequestSchema.parse(parsedQuery);
       const normalizedTimeFilter = (timeFilter || 'all') as string;
       
       // Set up Server-Sent Events
@@ -713,7 +719,7 @@ Disallow: /*.css$`);
           console.log(`✅ Generated ${recommendations.length} personalized recommendations`);
           
           // Determine the source message based on what data we used
-          let sourceMessage = 'personalized job recommendations';
+          let sourceMessage = `Found ${recommendations.length} personalized job recommendations based on your profile and preferences. These update daily at 9PM EST.`;
           if (hasResume && hasApplicationHistory) {
             sourceMessage = 'recommendations based on your resume analysis and application history';
           } else if (hasResume) {
@@ -726,7 +732,7 @@ Disallow: /*.css$`);
           
           return res.json({
             recommendations: recommendations,
-            message: `Found ${recommendations.length} ${sourceMessage}.`,
+            message: sourceMessage,
             isFirstTime: false,
             source: 'comprehensive_analysis'
           });

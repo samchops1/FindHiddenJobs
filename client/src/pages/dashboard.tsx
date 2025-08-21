@@ -246,15 +246,15 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="recommendations" className="space-y-4">
-                {recommendationsLoading && !recommendationsData && isFirstTimeUser ? (
+                {recommendationsLoading && !recommendationsData ? (
                   <Card>
                     <CardContent className="p-12 text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
                       <h3 className="text-xl font-semibold mb-2">
-                        Generating Your First Recommendations...
+                        Loading Recommendations...
                       </h3>
                       <p className="text-muted-foreground">
-                        Analyzing your profile to generate personalized recommendations. This usually takes a moment for new users.
+                        Fetching your personalized job recommendations.
                       </p>
                     </CardContent>
                   </Card>
@@ -276,16 +276,24 @@ export default function Dashboard() {
                     <CardContent className="p-12 text-center">
                       <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-xl font-semibold mb-2">
-                        {isFirstTimeUser ? 'Welcome! Set Up Your Recommendations' : 'Recommendations Coming Soon'}
+                        {isFirstTimeUser ? 'Complete Your Profile for Recommendations' : 'No Recommendations Yet'}
                       </h3>
                       <p className="text-muted-foreground mb-4">
-                        {isFirstTimeUser 
-                          ? (recommendationsMessage || 'Your first set of personalized recommendations will be generated at 9 PM EST today! In the meantime, complete your profile by uploading a resume or start searching jobs.')
-                          : (recommendationsMessage || 'Your personalized recommendations will be refreshed daily at 9 PM EST. Check back after 9 PM for your updated job matches!')
-                        }
+                        {recommendationsMessage || (isFirstTimeUser 
+                          ? 'To get personalized job recommendations, please complete your profile by uploading a resume or setting job preferences.'
+                          : 'We don\'t have enough information to generate recommendations. Upload a resume, set preferences, or apply to jobs to help us understand your interests.'
+                        )}
                       </p>
+                      <div className="space-y-2 mb-4">
+                        {recommendationsData?.actionItems?.map((item, index) => (
+                          <div key={index} className="text-sm text-muted-foreground flex items-center space-x-2">
+                            <span className="w-2 h-2 bg-primary rounded-full"></span>
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
                       <Button onClick={() => window.location.href = '/'}>
-                        {isFirstTimeUser ? 'Start Job Search' : 'Browse Jobs'}
+                        {isFirstTimeUser ? 'Start Setting Up Profile' : 'Browse Jobs'}
                       </Button>
                     </CardContent>
                   </Card>
@@ -297,8 +305,7 @@ export default function Dashboard() {
                         <h3 className="font-semibold text-foreground">AI-Powered Recommendations</h3>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        These jobs are personally selected for you based on your preferences, resume, and application history. 
-                        New recommendations are generated daily at 9PM EST.
+                        {recommendationsMessage || 'These jobs are personally selected for you based on your preferences, resume, and application history. New recommendations are generated daily at 9PM EST.'}
                       </p>
                     </div>
                     {recommendedJobs.map((job: RecommendedJob, index: number) => (
