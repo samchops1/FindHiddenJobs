@@ -29,7 +29,8 @@
       "Bash(npx tsc:*)",
       "Bash(kill:*)",
       "Bash(pkill:*)",
-      "Bash(unset:*)"
+      "Bash(unset:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []

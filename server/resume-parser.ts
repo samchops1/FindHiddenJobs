@@ -66,82 +66,24 @@ export class ResumeParser {
     try {
       if (fileExtension === '.pdf') {
         try {
-          // Try to parse PDF using pdf-parse
+          // Use pdf-extraction library for better Node.js compatibility
+          const pdfExtraction = await import('pdf-extraction');
           const dataBuffer = fs.readFileSync(filePath);
-          const pdfParse = (await import('pdf-parse')).default;
-          const pdfData = await pdfParse(dataBuffer);
           
-          if (pdfData.text && pdfData.text.length > 50) {
-            console.log(`✅ Successfully extracted ${pdfData.text.length} characters from PDF`);
-            return pdfData.text;
+          console.log(`📄 Extracting text from PDF (${dataBuffer.length} bytes)`);
+          
+          const data = await pdfExtraction.default(dataBuffer);
+          
+          if (data.text && data.text.length > 50) {
+            console.log(`✅ Successfully extracted ${data.text.length} characters from PDF`);
+            console.log(`📝 PDF text preview: ${data.text.substring(0, 300)}...`);
+            return data.text.trim();
           } else {
-            throw new Error('PDF text extraction returned insufficient content');
+            throw new Error('PDF extraction returned insufficient content');
           }
         } catch (pdfError) {
-          console.warn('PDF parsing failed, trying alternative methods:', pdfError);
-          
-          // Try to read the file and extract readable text sequences
-          try {
-            const buffer = fs.readFileSync(filePath);
-            const rawText = buffer.toString('binary');
-            
-            // Extract readable text patterns more effectively
-            const readableSegments: string[] = [];
-            
-            // Look for text in PDF stream objects and between parentheses
-            const patterns = [
-              /\(([^)]{3,})\)/g,                    // Text in parentheses
-              /BT\s+([^E]+)\s+ET/g,                 // Text between BT/ET markers
-              /Tj\s*\[([^\]]+)\]/g,                 // Text arrays
-              /([A-Z][a-zA-Z\s,\.]{10,})/g         // Capitalized readable sequences
-            ];
-            
-            for (const pattern of patterns) {
-              let match;
-              while ((match = pattern.exec(rawText)) !== null) {
-                const segment = match[1] || match[0];
-                if (segment && /[A-Za-z]/.test(segment)) {
-                  readableSegments.push(segment.trim());
-                }
-              }
-            }
-            
-            // Also try to find email addresses, names, and common resume keywords
-            const emailMatch = rawText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-            if (emailMatch) readableSegments.push(emailMatch[1]);
-            
-            // Look for phone numbers
-            const phoneMatch = rawText.match(/(\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4})/);
-            if (phoneMatch) readableSegments.push(phoneMatch[1]);
-            
-            // Clean and combine all segments
-            let extractedText = readableSegments
-              .filter(segment => segment.length > 2)
-              .map(segment => segment
-                .replace(/[^\w\s@.-]/g, ' ')        // Clean special chars but keep email/web chars
-                .replace(/\s+/g, ' ')               // Normalize whitespace
-                .trim()
-              )
-              .filter(segment => segment.length > 2)
-              .join(' ');
-            
-            // Additional cleaning
-            extractedText = extractedText
-              .replace(/(\w)\s+(\w)\s+(\w)/g, '$1$2$3')  // Fix broken words
-              .replace(/\s+/g, ' ')
-              .trim();
-            
-            console.log(`📝 Extracted readable segments: ${extractedText.substring(0, 200)}...`);
-            
-            if (extractedText.length > 100) {
-              console.log(`✅ Extracted readable text from PDF: ${extractedText.length} characters`);
-              return extractedText;
-            }
-          } catch (altError) {
-            console.warn('Alternative PDF text extraction also failed:', altError);
-          }
-          
-          throw new Error('Could not extract readable text from PDF file');
+          console.error('PDF.js extraction failed:', pdfError);
+          throw new Error('Could not extract readable text from PDF file. Please ensure the PDF contains selectable text.');
         }
       } else if (fileExtension === '.docx') {
         try {
