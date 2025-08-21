@@ -498,16 +498,31 @@ Disallow: /*.css$`);
       // Use the resume parser to analyze the uploaded file
       const analysis = await resumeParser.parseResume(filePath, fileName);
       
-      // Update user preferences with job titles from resume
+      // Update user preferences with job titles from resume (only if analysis found valid data)
       try {
         const existingPrefs = await storage.getUserPreferences(userId);
-        await storage.saveUserPreferences({
-          userId,
-          jobTypes: analysis.suggestedJobTitles || existingPrefs?.jobTypes || ['Software Engineer'],
-          preferredLocation: existingPrefs?.preferredLocation || 'Remote',
-          emailNotifications: existingPrefs?.emailNotifications ?? true
-        });
-        console.log(`✅ Updated user preferences with resume job titles: ${analysis.suggestedJobTitles?.join(', ')}`);
+        const jobTypesToUse = (analysis.suggestedJobTitles && analysis.suggestedJobTitles.length > 0) 
+          ? analysis.suggestedJobTitles 
+          : existingPrefs?.jobTypes || ['Software Engineer'];
+        
+        // Use upsert-like logic for preferences
+        if (existingPrefs) {
+          await storage.saveUserPreferences({
+            userId,
+            jobTypes: jobTypesToUse,
+            preferredLocation: existingPrefs.preferredLocation || 'Remote',
+            emailNotifications: existingPrefs.emailNotifications ?? true
+          });
+        } else {
+          await storage.saveUserPreferences({
+            userId,
+            jobTypes: jobTypesToUse,
+            preferredLocation: 'Remote',
+            emailNotifications: true
+          });
+        }
+        
+        console.log(`✅ Updated user preferences with job titles: ${jobTypesToUse.join(', ')}`);
       } catch (prefError) {
         console.log(`ℹ️ Error updating user preferences:`, prefError);
       }

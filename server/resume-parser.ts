@@ -85,10 +85,22 @@ export class ResumeParser {
             const buffer = fs.readFileSync(filePath);
             const text = buffer.toString('utf8');
             // Look for readable text patterns
-            const cleanedText = text.replace(/[\x00-\x08\x0E-\x1F\x7F-\x9F]/g, ' ').replace(/\s+/g, ' ').trim();
+            let cleanedText = text
+              .replace(/[\x00-\x08\x0E-\x1F\x7F-\x9F]/g, ' ')  // Remove control characters
+              .replace(/[^\w\s\-\.\@\(\)\,\:\;\!\?]/g, ' ')     // Keep only word chars, spaces, and common punctuation
+              .replace(/\s+/g, ' ')                              // Normalize whitespace
+              .trim();
+            
+            // Additional cleaning for PDF artifacts
+            cleanedText = cleanedText
+              .replace(/(\w)\s+(\w)/g, '$1$2')                  // Remove spaces within words
+              .replace(/\b(\w)\s+(\w)\b/g, '$1$2')              // Fix broken words
+              .replace(/\s+/g, ' ')                              // Normalize again
+              .replace(/(.{50,}?)\s+/g, '$1\n')                 // Add line breaks for readability
+              .trim();
             
             if (cleanedText.length > 100) {
-              console.log(`✅ Extracted text from PDF using alternative method: ${cleanedText.length} characters`);
+              console.log(`✅ Extracted and cleaned text from PDF: ${cleanedText.length} characters`);
               return cleanedText;
             }
           } catch (altError) {
@@ -214,6 +226,8 @@ Guidelines:
       `.trim();
 
       console.log('🤖 Sending resume to OpenAI for analysis...');
+      console.log('📝 Resume text preview (first 500 chars):', resumeText.substring(0, 500));
+      console.log('📊 Full resume text length:', resumeText.length);
       
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini', // Using the cost-effective model
@@ -238,6 +252,7 @@ Guidelines:
       }
 
       console.log('✅ Received analysis from OpenAI');
+      console.log('🔍 Raw OpenAI response:', aiResponse?.substring(0, 1000));
       
       // Parse the JSON response
       let analysis: ResumeAnalysis;
