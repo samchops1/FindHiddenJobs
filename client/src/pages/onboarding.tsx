@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { JobPreferencesForm } from '@/components/onboarding/job-preferences-form';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface JobPreferences {
   jobTypes: string[];
@@ -47,6 +47,7 @@ async function saveJobPreferences(userId: string, preferences: JobPreferences) {
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const { user, loading } = useAuth();
+  const { toast } = useToast();
 
   const savePreferencesMutation = useMutation({
     mutationFn: (preferences: JobPreferences) => {
@@ -54,12 +55,19 @@ export default function Onboarding() {
       return saveJobPreferences(user.id, preferences);
     },
     onSuccess: () => {
-      toast.success('Job preferences saved! We\'ll start finding opportunities for you.');
+      toast({
+        title: "Success!",
+        description: "Job preferences saved! We'll start finding opportunities for you."
+      });
       navigate('/dashboard');
     },
     onError: (error) => {
       console.error('Error saving preferences:', error);
-      toast.error('Failed to save preferences. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to save preferences. Please try again.",
+        variant: "destructive"
+      });
     },
   });
 
@@ -68,7 +76,10 @@ export default function Onboarding() {
   };
 
   const handleSkip = () => {
-    toast.info('You can set your job preferences later in your dashboard.');
+    toast({
+      title: "Skipped",
+      description: "You can set your job preferences later in your dashboard."
+    });
     navigate('/dashboard');
   };
 
