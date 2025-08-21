@@ -80,28 +80,62 @@ export class ResumeParser {
         } catch (pdfError) {
           console.warn('PDF parsing failed, trying alternative methods:', pdfError);
           
-          // Try to read the file as plain text (some PDFs might have readable text content)
+          // Try to read the file and extract readable text sequences
           try {
             const buffer = fs.readFileSync(filePath);
-            const text = buffer.toString('utf8');
-            // Look for readable text patterns
-            let cleanedText = text
-              .replace(/[\x00-\x08\x0E-\x1F\x7F-\x9F]/g, ' ')  // Remove control characters
-              .replace(/[^\w\s\-\.\@\(\)\,\:\;\!\?]/g, ' ')     // Keep only word chars, spaces, and common punctuation
-              .replace(/\s+/g, ' ')                              // Normalize whitespace
+            const rawText = buffer.toString('binary');
+            
+            // Extract readable text patterns more effectively
+            const readableSegments: string[] = [];
+            
+            // Look for text in PDF stream objects and between parentheses
+            const patterns = [
+              /\(([^)]{3,})\)/g,                    // Text in parentheses
+              /BT\s+([^E]+)\s+ET/g,                 // Text between BT/ET markers
+              /Tj\s*\[([^\]]+)\]/g,                 // Text arrays
+              /([A-Z][a-zA-Z\s,\.]{10,})/g         // Capitalized readable sequences
+            ];
+            
+            for (const pattern of patterns) {
+              let match;
+              while ((match = pattern.exec(rawText)) !== null) {
+                const segment = match[1] || match[0];
+                if (segment && /[A-Za-z]/.test(segment)) {
+                  readableSegments.push(segment.trim());
+                }
+              }
+            }
+            
+            // Also try to find email addresses, names, and common resume keywords
+            const emailMatch = rawText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+            if (emailMatch) readableSegments.push(emailMatch[1]);
+            
+            // Look for phone numbers
+            const phoneMatch = rawText.match(/(\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4})/);
+            if (phoneMatch) readableSegments.push(phoneMatch[1]);
+            
+            // Clean and combine all segments
+            let extractedText = readableSegments
+              .filter(segment => segment.length > 2)
+              .map(segment => segment
+                .replace(/[^\w\s@.-]/g, ' ')        // Clean special chars but keep email/web chars
+                .replace(/\s+/g, ' ')               // Normalize whitespace
+                .trim()
+              )
+              .filter(segment => segment.length > 2)
+              .join(' ');
+            
+            // Additional cleaning
+            extractedText = extractedText
+              .replace(/(\w)\s+(\w)\s+(\w)/g, '$1$2$3')  // Fix broken words
+              .replace(/\s+/g, ' ')
               .trim();
             
-            // Additional cleaning for PDF artifacts
-            cleanedText = cleanedText
-              .replace(/(\w)\s+(\w)/g, '$1$2')                  // Remove spaces within words
-              .replace(/\b(\w)\s+(\w)\b/g, '$1$2')              // Fix broken words
-              .replace(/\s+/g, ' ')                              // Normalize again
-              .replace(/(.{50,}?)\s+/g, '$1\n')                 // Add line breaks for readability
-              .trim();
+            console.log(`📝 Extracted readable segments: ${extractedText.substring(0, 200)}...`);
             
-            if (cleanedText.length > 100) {
-              console.log(`✅ Extracted and cleaned text from PDF: ${cleanedText.length} characters`);
-              return cleanedText;
+            if (extractedText.length > 100) {
+              console.log(`✅ Extracted readable text from PDF: ${extractedText.length} characters`);
+              return extractedText;
             }
           } catch (altError) {
             console.warn('Alternative PDF text extraction also failed:', altError);
