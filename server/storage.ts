@@ -82,6 +82,17 @@ export interface IStorage {
     status: string;
     notes?: string;
   }>>;
+
+  getAllApplications?(): Promise<Array<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    status: string;
+    notes?: string;
+  }>>;
   
   // Resume analysis
   saveResumeAnalysis(data: {
@@ -309,6 +320,21 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
   }
 
+  // Get all applications (for scheduler use)
+  async getAllApplications(): Promise<Array<{
+    id: string;
+    userId: string;
+    jobUrl: string;
+    jobTitle: string;
+    company: string;
+    appliedAt: Date;
+    status: string;
+    notes?: string;
+  }>> {
+    return Array.from(this.applications.values())
+      .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
+  }
+
   // Resume analysis implementation
   async saveResumeAnalysis(data: {
     userId: string;
@@ -380,7 +406,7 @@ export class MemStorage implements IStorage {
     // Get users who have preferences and want email notifications
     const eligibleUsers = [];
     
-    for (const [userId, preferences] of this.userPreferences.entries()) {
+    for (const [userId, preferences] of Array.from(this.userPreferences.entries())) {
       if (preferences.emailNotifications && 
           (preferences.jobTypes?.length > 0 || 
            Array.from(this.resumeAnalyses.keys()).some(key => key.startsWith(`${userId}_`)))) {

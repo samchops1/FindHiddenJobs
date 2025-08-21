@@ -182,8 +182,8 @@ export class JobRecommendationScheduler {
       const usersWithApplications = new Set<string>();
       try {
         // Get users who have job applications
-        const applications = await storage.getUserApplications?.('*') || []; // Get all applications
-        applications.forEach(app => usersWithApplications.add(app.userId));
+        const applications = await storage.getAllApplications?.() || []; // Get all applications
+        applications.forEach((app: {userId: string}) => usersWithApplications.add(app.userId));
       } catch (error) {
         console.log('Could not fetch user applications for recommendations');
       }

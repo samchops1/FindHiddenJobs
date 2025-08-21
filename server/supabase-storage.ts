@@ -448,6 +448,28 @@ export class SupabaseStorage implements IStorage {
     }));
   }
 
+  async getAllApplications() {
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('job_applications')
+      .select('*')
+      .order('applied_at', { ascending: false });
+
+    if (error) return [];
+
+    return (data || []).map(item => ({
+      id: item.id,
+      userId: item.user_id,
+      jobUrl: item.job_url,
+      jobTitle: item.job_title,
+      company: item.company,
+      appliedAt: new Date(item.applied_at),
+      status: item.status || 'applied',
+      notes: item.notes
+    }));
+  }
+
   // Resume analysis
   async saveResumeAnalysis(data: {
     userId: string;

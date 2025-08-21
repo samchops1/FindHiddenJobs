@@ -160,7 +160,7 @@ export default function Dashboard() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -204,17 +204,131 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Recommendations</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {recommendationsLoading ? '...' : recommendedJobs.length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column - Tabs */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="saved-jobs" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+            <Tabs defaultValue="recommendations" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
                 <TabsTrigger value="saved-jobs">Saved Jobs</TabsTrigger>
                 <TabsTrigger value="applications">Applications</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="recommendations" className="space-y-4">
+                {recommendationsLoading ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+                      <h3 className="text-xl font-semibold mb-2">Loading Recommendations</h3>
+                      <p className="text-muted-foreground">
+                        Generating personalized job recommendations for you...
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : recommendedJobs.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-xl font-semibold mb-2">No Recommendations Yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        {recommendationsMessage || 'Set job preferences, upload a resume, or apply to jobs to get personalized recommendations.'}
+                      </p>
+                      <Button onClick={() => window.location.href = '/'}>
+                        Start Job Search
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Star className="w-5 h-5 text-yellow-500" />
+                        <h3 className="font-semibold text-foreground">AI-Powered Recommendations</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        These jobs are personally selected for you based on your preferences, resume, and application history. 
+                        New recommendations are generated daily at 9PM EST.
+                      </p>
+                    </div>
+                    {recommendedJobs.map((job: RecommendedJob, index: number) => (
+                      <Card key={`${job.url}-${index}`} className="hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-start space-x-4">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-lg text-foreground mb-1">
+                                    {job.title}
+                                  </h3>
+                                  <div className="flex items-center space-x-1 text-primary font-medium mb-2">
+                                    <Building className="w-4 h-4" />
+                                    <span>{job.company}</span>
+                                  </div>
+                                  {job.location && (
+                                    <div className="flex items-center space-x-1 text-muted-foreground text-sm mb-3">
+                                      <MapPin className="w-4 h-4" />
+                                      <span>{job.location}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                    <Badge variant="secondary">{job.platform}</Badge>
+                                    <Badge variant="outline" className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200">
+                                      <Sparkles className="w-3 h-3 mr-1" />
+                                      AI Recommended
+                                    </Badge>
+                                  </div>
+                                  {job.tags && job.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-3">
+                                      {job.tags.slice(0, 3).map((tag, tagIndex) => (
+                                        <Badge key={tagIndex} variant="outline" className="text-xs">
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                      {job.tags.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          +{job.tags.length - 3} more
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(job.url, '_blank')}
+                              className="flex items-center space-x-1"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              <span>View</span>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </>
+                )}
+              </TabsContent>
 
               <TabsContent value="saved-jobs" className="space-y-4">
                 {savedJobs.length === 0 ? (
