@@ -38,11 +38,11 @@ export default function Home() {
     queryKey: ["/api/search", searchParams, currentPage],
     queryFn: () => searchParams ? searchJobs({ ...searchParams, page: currentPage }) : Promise.resolve({ jobs: [], pagination: { currentPage: 1, totalPages: 0, totalJobs: 0, jobsPerPage: 25, hasNextPage: false, hasPrevPage: false } }),
     enabled: !!searchParams && !isStreamingSearch,
-    staleTime: 10 * 60 * 1000, // 10 minutes - matches backend cache
-    gcTime: 15 * 60 * 1000, // 15 minutes - keep cached pages longer
+    staleTime: 60 * 60 * 1000, // 1 hour - matches backend cache
+    gcTime: 90 * 60 * 1000, // 1.5 hours - keep cached pages longer
   });
 
-  const jobs = isStreamingSearch ? streamingJobs : (searchResponse?.jobs || []);
+  const jobs = isStreamingSearch ? streamingJobs : (streamingJobs.length > 0 ? streamingJobs : (searchResponse?.jobs || []));
   const pagination = searchResponse?.pagination;
 
   const handleSearch = (params: SearchRequest) => {
@@ -85,23 +85,24 @@ export default function Home() {
         case 'error':
           console.error('Streaming error:', event.data);
           setStreamingError(event.data.error);
-          // Fall back to regular search
+          // Keep the results we've collected so far
           setIsStreamingSearch(false);
-          setStreamingError('Streaming failed, falling back to regular search...');
-          // Trigger regular search as fallback
+          setStreamingError(`Search interrupted. Showing ${streamingJobs.length} results found so far.`);
+          // Clear error after showing it briefly
           setTimeout(() => {
             setStreamingError(null);
-          }, 1000);
+          }, 3000);
           break;
       }
     }).catch((error) => {
       console.error('Streaming connection error:', error);
+      // Keep the results we've collected so far
       setIsStreamingSearch(false);
-      setStreamingError('Connection failed, falling back to regular search...');
-      // Trigger regular search as fallback
+      setStreamingError(`Connection interrupted. Showing ${streamingJobs.length} results found so far.`);
+      // Clear error after showing it briefly
       setTimeout(() => {
         setStreamingError(null);
-      }, 1000);
+      }, 3000);
     });
   };
 
@@ -271,7 +272,7 @@ export default function Home() {
                     <p className="text-sm text-muted-foreground">{streamingMessage}</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">{streamingJobs.length} jobs found</div>
+                    <div className="text-sm font-medium text-foreground">{jobs.length} jobs found</div>
                     <div className="text-xs text-muted-foreground">{Math.round(streamingProgress)}% complete</div>
                   </div>
                 </div>

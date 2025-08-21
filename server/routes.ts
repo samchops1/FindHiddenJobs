@@ -20,7 +20,7 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // In-memory cache for full job search results (for pagination)
 const jobSearchCache = new Map<string, { jobs: any[]; timestamp: number }>();
-const JOB_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const JOB_CACHE_DURATION = 60 * 60 * 1000; // 1 hour - matches Google API cache for scalability
 
 // Configure multer for file uploads
 const upload = multer({
@@ -466,14 +466,8 @@ Disallow: /*.css$`);
       const filePath = req.file.path;
       const fileName = req.file.originalname;
       
-      // Create a simple analysis for now (TODO: Fix OpenAI integration)
-      const analysis = {
-        skills: ['Communication', 'Problem Solving', 'Teamwork'],
-        experience: '2-5 years',
-        jobTitles: ['Software Developer'],
-        education: ['Bachelor\'s Degree'],
-        summary: 'Resume uploaded successfully'
-      };
+      // Use the resume parser to analyze the uploaded file
+      const analysis = await resumeParser.parseResume(filePath, fileName);
       
       // TODO: Fix database foreign key constraints for user creation
       // For now, just return success without saving to database
