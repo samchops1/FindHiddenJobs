@@ -4,14 +4,19 @@ import { JobSearchForm } from "@/components/job-search-form";
 import { JobCard } from "@/components/job-card";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { searchJobs, type SearchResponse } from "@/lib/job-api";
-import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase } from "lucide-react";
+import { AlertCircle, Clock, Search, Building, Globe, ChevronLeft, ChevronRight, Briefcase, User, LogOut } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { AuthModal } from "@/components/auth/auth-modal";
+import { useAuth } from "@/hooks/useAuth";
 import type { Job, SearchRequest } from "@shared/schema";
 
 export default function Home() {
   const [searchParams, setSearchParams] = useState<SearchRequest | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const { user, loading, signOut } = useAuth();
 
   const {
     data: searchResponse,
@@ -67,15 +72,59 @@ export default function Home() {
                 <span className="text-sm text-muted-foreground font-medium">.com</span>
               </div>
             </a>
-            <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
-              <div className="flex items-center space-x-1">
-                <Building className="w-4 h-4" />
-                <span>Multi-platform</span>
+            <div className="flex items-center space-x-4">
+              <div className="hidden md:flex items-center space-x-6 text-muted-foreground text-sm">
+                <div className="flex items-center space-x-1">
+                  <Building className="w-4 h-4" />
+                  <span>Multi-platform</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Globe className="w-4 h-4" />
+                  <span>All locations</span>
+                </div>
               </div>
-              <div className="flex items-center space-x-1">
-                <Globe className="w-4 h-4" />
-                <span>All locations</span>
-              </div>
+              
+              {!loading && (
+                user ? (
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <User className="w-4 h-4" />
+                      <span className="hidden md:inline">{user.user_metadata?.first_name || user.email}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => signOut()}
+                      className="flex items-center space-x-1"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="hidden md:inline">Sign out</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setAuthModalOpen(true);
+                      }}
+                    >
+                      Sign in
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setAuthModalOpen(true);
+                      }}
+                    >
+                      Sign up
+                    </Button>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -296,6 +345,12 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        defaultMode={authMode}
+      />
     </div>
   );
 }
